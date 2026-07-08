@@ -9,6 +9,7 @@ interface LeaderboardRowProps {
   position: number;
   isCurrentUser: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 export function LeaderboardRow({
@@ -16,18 +17,20 @@ export function LeaderboardRow({
   position,
   isCurrentUser,
   className = '',
+  onClick,
 }: LeaderboardRowProps) {
   const classes = [
     'lb-row',
     position === 1 && 'lb-row--first',
     isCurrentUser && position !== 1 && 'lb-row--current',
+    onClick && 'interactive',
     className,
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <div className={classes}>
+    <div className={classes} onClick={onClick} role={onClick ? "button" : undefined}>
       <div className={`lb-row__position lb-row__position--${position}`}>
         {position}
       </div>
