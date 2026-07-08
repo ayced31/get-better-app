@@ -14,9 +14,17 @@ app.use(helmet());
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    // Allow localhost, 127.0.0.1, and standard private IP ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-    const isLocal = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin);
-    if (isLocal || origin === process.env.CORS_ORIGIN) {
+    
+    // Allow localhost, 127.0.0.1, and private networks over http or https
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin);
+    
+    // Automatically allow any Vercel deployments (production or previews)
+    const isVercel = /\.vercel\.app$/.test(origin) || origin.endsWith('.vercel.app');
+    
+    // Normalize configured CORS_ORIGIN (remove trailing slashes)
+    const configuredOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, '');
+
+    if (isLocal || isVercel || origin === configuredOrigin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
