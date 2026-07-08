@@ -1,0 +1,75 @@
+/* ─── Streak Indicator ───────────────────────────────────────────── */
+
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    135deg,
+    rgba(245, 166, 35, 0.12) 0%,
+    rgba(229, 72, 77, 0.08) 100%
+  );
+  white-space: nowrap;
+}
+
+.streak__icon {
+  font-size: 14px;
+  line-height: 1;
+  animation: glow 2s ease-in-out infinite;
+}
+
+.streak__count {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+
+.streak__label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-subtle);
+  font-weight: 400;
+}
+
+/* Sizes */
+.streak--lg {
+  padding: 6px 16px;
+  gap: var(--space-xs);
+}
+
+.streak--lg .streak__icon {
+  font-size: 20px;
+}
+
+.streak--lg .streak__count {
+  font-size: var(--text-lg);
+}
+
+/* Zero streak */
+.streak--zero {
+  background: var(--color-surface-1);
+}
+
+.streak--zero .streak__icon {
+  animation: none;
+  opacity: 0.4;
+}
+
+.streak--zero .streak__count {
+  color: var(--color-ink-tertiary);
+}
+
+/* High streak glow */
+.streak--hot {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 166, 35, 0.2) 0%,
+    rgba(229, 72, 77, 0.15) 100%
+  );
+}
+
+.streak--hot .streak__icon {
+  animation: glow 1s ease-in-out infinite;
+}

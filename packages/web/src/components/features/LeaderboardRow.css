@@ -1,0 +1,87 @@
+/* ─── Leaderboard Row ────────────────────────────────────────────── */
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+
+.lb-row:hover {
+  background-color: var(--color-surface-1);
+}
+
+.lb-row--current {
+  background-color: rgba(94, 106, 210, 0.06);
+  border: 1px solid rgba(94, 106, 210, 0.15);
+}
+
+.lb-row--current:hover {
+  background-color: rgba(94, 106, 210, 0.1);
+}
+
+.lb-row__position {
+  width: 32px;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-ink-subtle);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-row__position--1 {
+  font-size: 22px;
+}
+
+.lb-row__position--2 {
+  font-size: 20px;
+}
+
+.lb-row__position--3 {
+  font-size: 20px;
+}
+
+.lb-row__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.lb-row__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-row__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.lb-row__points {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+.lb-row__streak-wrap {
+  flex-shrink: 0;
+}
+
+/* Divider between rows */
+.lb-row + .lb-row {
+  border-top: 1px solid var(--color-hairline);
+}

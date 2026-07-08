@@ -1,0 +1,106 @@
+/* ─── Activity Card ──────────────────────────────────────────────── */
+
+.activity-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast),
+              border-color var(--transition-fast),
+              transform var(--transition-fast);
+}
+
+.activity-card:hover {
+  background-color: var(--color-surface-2);
+  border-color: var(--color-hairline-strong);
+}
+
+.activity-card:active {
+  transform: scale(0.98);
+}
+
+.activity-card--logged {
+  border-color: rgba(39, 166, 68, 0.3);
+  background-color: rgba(39, 166, 68, 0.06);
+}
+
+.activity-card--logged:hover {
+  background-color: rgba(39, 166, 68, 0.1);
+  border-color: rgba(39, 166, 68, 0.4);
+}
+
+.activity-card--penalty {
+  border-color: rgba(229, 72, 77, 0.2);
+}
+
+.activity-card--penalty.activity-card--logged {
+  border-color: rgba(229, 72, 77, 0.3);
+  background-color: rgba(229, 72, 77, 0.06);
+}
+
+.activity-card--loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.activity-card__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.activity-card__check {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--color-hairline-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: transparent;
+  transition: all var(--transition-fast);
+}
+
+.activity-card--logged .activity-card__check {
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+  color: white;
+}
+
+.activity-card__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-card__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.activity-card__points {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-card__points--positive {
+  color: var(--color-success);
+}
+
+.activity-card__points--negative {
+  color: var(--color-danger);
+}

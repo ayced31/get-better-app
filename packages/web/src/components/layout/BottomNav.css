@@ -1,0 +1,62 @@
+/* ─── Bottom Navigation (Mobile) ─────────────────────────────────── */
+
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-sticky);
+  background-color: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  height: var(--bottom-nav-height);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.bottom-nav__container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 100%;
+  padding: 0 var(--space-xs);
+}
+
+.bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-ink-tertiary);
+  transition: color var(--transition-fast),
+              background-color var(--transition-fast);
+  min-width: 56px;
+}
+
+.bottom-nav__item:hover {
+  color: var(--color-ink-subtle);
+}
+
+.bottom-nav__item--active {
+  color: var(--color-ink);
+}
+
+.bottom-nav__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.bottom-nav__label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: block;
+  }
+}

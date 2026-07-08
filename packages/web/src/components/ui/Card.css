@@ -1,0 +1,65 @@
+/* ─── Card ───────────────────────────────────────────────────────── */
+
+.card {
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: border-color var(--transition-fast),
+              background-color var(--transition-fast);
+}
+
+.card--interactive {
+  cursor: pointer;
+}
+
+.card--interactive:hover {
+  border-color: var(--color-hairline-strong);
+  background-color: var(--color-surface-2);
+}
+
+.card--surface-2 {
+  background-color: var(--color-surface-2);
+}
+
+.card--surface-3 {
+  background-color: var(--color-surface-3);
+}
+
+.card--flush {
+  padding: 0;
+}
+
+.card--compact {
+  padding: var(--space-md);
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.card__title {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  line-height: 1.25;
+}
+
+.card__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-ink-subtle);
+  margin-top: var(--space-xxs);
+}
+
+.card__body {
+  /* Default body styling */
+}
+
+.card__footer {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-hairline);
+}

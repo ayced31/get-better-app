@@ -1,0 +1,70 @@
+/* ─── Rank Badge ─────────────────────────────────────────────────── */
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  background-color: rgba(94, 106, 210, 0.12);
+  color: var(--color-primary-hover);
+}
+
+.rank-badge__emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.rank-badge--lg {
+  padding: 6px 16px;
+  font-size: var(--text-sm);
+  gap: var(--space-xs);
+}
+
+.rank-badge--lg .rank-badge__emoji {
+  font-size: 20px;
+}
+
+.rank-badge--xl {
+  padding: 10px 24px;
+  font-size: var(--text-lg);
+  gap: var(--space-sm);
+}
+
+.rank-badge--xl .rank-badge__emoji {
+  font-size: 32px;
+}
+
+/* Rank color tiers based on progression */
+.rank-badge--negative {
+  background-color: rgba(229, 72, 77, 0.12);
+  color: #f09093;
+}
+
+.rank-badge--low {
+  background-color: rgba(245, 166, 35, 0.12);
+  color: #ffc865;
+}
+
+.rank-badge--mid {
+  background-color: rgba(94, 106, 210, 0.12);
+  color: #a5b0ff;
+}
+
+.rank-badge--high {
+  background-color: rgba(39, 166, 68, 0.12);
+  color: #4dd66a;
+}
+
+.rank-badge--elite {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 166, 35, 0.15) 0%,
+    rgba(130, 143, 255, 0.15) 100%
+  );
+  color: var(--color-warning);
+}
