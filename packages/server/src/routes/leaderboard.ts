@@ -53,6 +53,7 @@ router.get('/', async (req, res) => {
       avatarUrl: users.avatarUrl,
       createdAt: users.createdAt,
       rawScore: sql<number>`COALESCE(SUM(${activityLogs.points}), 0)`.as('raw_score'),
+      firstEntryTime: sql<string | null>`MIN(${activityLogs.createdAt})`.as('first_entry_time'),
     })
     .from(users)
     .leftJoin(
@@ -102,12 +103,30 @@ router.get('/', async (req, res) => {
         rankEmoji: rank.emoji,
         todayPoints,
         streak,
+        firstEntryTime: row.firstEntryTime ? new Date(row.firstEntryTime).getTime() : null,
       };
     })
   );
 
-  // Sort by display points (already sorted by raw_score but re-sort for consistency)
-  entries.sort((a, b) => b.displayPoints - a.displayPoints || a.user.username.localeCompare(b.user.username));
+  // Sort by:
+  // 1. displayPoints (descending)
+  // 2. firstEntryTime (ascending - who logged first in the period)
+  // 3. user registration date (ascending - who signed up first)
+  entries.sort((a, b) => {
+    if (b.displayPoints !== a.displayPoints) {
+      return b.displayPoints - a.displayPoints;
+    }
+
+    const timeA = a.firstEntryTime ?? Infinity;
+    const timeB = b.firstEntryTime ?? Infinity;
+    if (timeA !== timeB) {
+      return timeA - timeB;
+    }
+
+    const regA = new Date(a.user.createdAt).getTime();
+    const regB = new Date(b.user.createdAt).getTime();
+    return regA - regB;
+  });
 
   res.json({ success: true, data: entries });
 });

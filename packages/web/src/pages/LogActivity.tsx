@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useLogs, useCreateLog, useDeleteLog } from '../hooks/useLogs';
 import { useAlertStore } from '../stores/alert';
 import { Card } from '../components/ui/Card';
@@ -15,7 +16,9 @@ export function LogActivity() {
   const createLog = useCreateLog();
   const deleteLog = useDeleteLog();
 
-  const [activeTab, setActiveTab] = useState<CategoryKey>('physical');
+  const [searchParams] = useSearchParams();
+  const initialCategory = (searchParams.get('category') as CategoryKey) || 'physical';
+  const [activeTab, setActiveTab] = useState<CategoryKey>(initialCategory);
 
   const { showAlert, showConfirm } = useAlertStore();
 
@@ -36,6 +39,10 @@ export function LogActivity() {
       createLog.mutateAsync({
         category: categoryKey,
         activity: activityKey,
+      }).then((res) => {
+        if (res.warning) {
+          showAlert(res.warning, 'Warning');
+        }
       }).catch((err: any) => {
         showAlert(err.message || 'Failed to log activity', 'Error');
       });

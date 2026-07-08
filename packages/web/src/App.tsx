@@ -4,6 +4,7 @@ import { PageShell } from './components/layout/PageShell';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { Landing } from './pages/Landing';
 import { Rules } from './pages/Rules';
 import { Dashboard } from './pages/Dashboard';
@@ -14,6 +15,7 @@ import { History } from './pages/History';
 import { useAuthStore } from './stores/auth';
 
 import { AlertDialog } from './components/ui/AlertDialog';
+import { ProfileSettingsModal } from './components/features/ProfileSettingsModal';
 
 function NotFoundRedirect() {
   const token = useAuthStore((state) => state.token);
@@ -27,6 +29,7 @@ export default function App() {
   return (
     <>
       <AlertDialog />
+      <ProfileSettingsModal />
       <Routes>
         <Route path="/" element={<Landing />} />
         
@@ -35,6 +38,7 @@ export default function App() {
           <Route path="/rules" element={<Rules />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Protected inside shell */}
           <Route element={<AuthLayout />}>

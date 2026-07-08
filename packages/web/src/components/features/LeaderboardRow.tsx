@@ -1,6 +1,5 @@
 // ─── Leaderboard Row ────────────────────────────────────────────
 import type { LeaderboardEntry } from '@get-better/shared';
-import { Avatar } from '../ui/Avatar';
 import { RankBadge } from './RankBadge';
 import { StreakIndicator } from './StreakIndicator';
 import './LeaderboardRow.css';
@@ -20,7 +19,8 @@ export function LeaderboardRow({
 }: LeaderboardRowProps) {
   const classes = [
     'lb-row',
-    isCurrentUser && 'lb-row--current',
+    position === 1 && 'lb-row--first',
+    isCurrentUser && position !== 1 && 'lb-row--current',
     className,
   ]
     .filter(Boolean)
@@ -33,19 +33,20 @@ export function LeaderboardRow({
       </div>
 
       <div className="lb-row__user">
-        <Avatar
-          src={entry.user.avatarUrl}
-          name={entry.user.displayName || entry.user.username}
-          size="sm"
-        />
         <span className="lb-row__name">
           {entry.user.displayName || entry.user.username}
         </span>
-        <RankBadge
-          rankName={entry.rank}
-          rankEmoji={entry.rankEmoji}
-          size="sm"
-        />
+        {position === 1 ? (
+          <span className="lb-row__moonlord">
+            Moonlord
+          </span>
+        ) : (
+          <RankBadge
+            rankName={entry.rank}
+            rankEmoji={entry.rankEmoji}
+            size="sm"
+          />
+        )}
       </div>
 
       <div className="lb-row__meta">

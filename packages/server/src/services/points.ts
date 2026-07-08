@@ -54,7 +54,7 @@ export async function calculatePoints(
       (l) => l.category === category && l.points > 0
     );
     if (categoryLogsToday.length >= categoryDef.maxDaily) {
-      return { points: 0, blocked: true, reason: `Daily cap reached for ${categoryDef.label}` };
+      return { points: 0, blocked: false, reason: `Daily cap reached for ${categoryDef.label}. Points won't count.` };
     }
   }
 
@@ -119,7 +119,7 @@ export async function calculatePoints(
 
   // 4. Enforce global daily cap for POSITIVE points
   if (points > 0) {
-    const hasStudied8hr = todaysLogs.some((l) => l.activity === 'study_8hr');
+    const hasStudied8hr = activity === 'study_8hr' || todaysLogs.some((l) => l.activity === 'study_8hr');
     const dailyCap = hasStudied8hr ? DAILY_POSITIVE_CAP_WITH_8HR_STUDY : DAILY_POSITIVE_CAP;
 
     const todaysPositiveTotal = todaysLogs
@@ -128,9 +128,11 @@ export async function calculatePoints(
 
     const headroom = dailyCap - todaysPositiveTotal;
     if (headroom <= 0) {
-      return { points: 0, blocked: true, reason: 'Daily positive point cap reached' };
+      return { points: 0, blocked: false, reason: "Daily positive point cap reached. Points won't count." };
     }
-    points = Math.min(points, headroom);
+    if (points > headroom) {
+      return { points: headroom, blocked: false, reason: `Daily positive point cap reached. Only +${headroom} points will count.` };
+    }
   }
 
   return { points, blocked: false };

@@ -89,9 +89,18 @@ export function Login() {
             </div>
 
             <div className="flex flex-col gap-xxs">
-              <label htmlFor="password" className="text-caption text-muted">
-                Password
-              </label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="password" className="text-caption text-muted">
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-caption interactive"
+                  style={{ color: 'var(--color-primary)', fontWeight: 500 }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

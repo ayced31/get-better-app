@@ -10,7 +10,6 @@ export function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const registerMutation = useRegister();
@@ -30,7 +29,6 @@ export function Register() {
         username,
         email,
         password,
-        displayName: displayName || undefined,
       });
       navigate('/', { replace: true });
     } catch (err: any) {
@@ -87,20 +85,6 @@ export function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 required
-              />
-            </div>
-
-            <div className="flex flex-col gap-xxs">
-              <label htmlFor="displayName" className="text-caption text-muted">
-                Display Name (Optional)
-              </label>
-              <Input
-                id="displayName"
-                type="text"
-                placeholder="e.g. Chad"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                autoComplete="name"
               />
             </div>
 

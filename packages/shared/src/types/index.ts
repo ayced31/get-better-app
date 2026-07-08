@@ -79,4 +79,5 @@ export type AuthResponse = {
 export type LogResponse = {
   log: ActivityLog;
   capStatus: DailyCapStatus;
+  warning?: string;
 };

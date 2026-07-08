@@ -61,9 +61,13 @@ export function Rules() {
         {/* Category: Sleep */}
         <Card className="p-md flex flex-col gap-xs">
           <h3 className="text-card-title">Sleep</h3>
-          <p className="text-caption text-tertiary">Penalties only</p>
+          <p className="text-caption text-tertiary">Rewards and Penalties</p>
           <div className="flex flex-col gap-xxs text-body-sm text-subtle" style={{ marginTop: 'var(--space-xxs)' }}>
-            <div className="flex justify-between"><span>Doomscrolling &gt;2hr</span><span className="text-danger">-2</span></div>
+            <div className="flex justify-between"><span>Sleeping before 11pm</span><span className="text-success">+1</span></div>
+            <div className="flex justify-between" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: '4px', marginTop: '4px' }}>
+              <span>Doomscrolling &gt;2hr</span>
+              <span className="text-danger">-2</span>
+            </div>
             <div className="flex justify-between"><span>Sleeping after 12 Midnight</span><span className="text-danger">-2</span></div>
             <div className="text-caption text-tertiary" style={{ marginTop: '2px' }}>
               * Late sleep penalty compounds by -0.5 points consecutively if trend continues.

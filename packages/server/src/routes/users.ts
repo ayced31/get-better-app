@@ -7,6 +7,8 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 import { calculateStreak } from '../services/streaks.js';
 import { backfillMissedDaysForUser } from '../services/backfill.js';
 
+import bcrypt from 'bcrypt';
+
 const router = Router();
 
 router.use(authMiddleware);
@@ -152,6 +154,88 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
       },
     },
   });
+});
+
+// ─── PATCH /me/profile ── Update display name or password ──────────
+
+router.patch('/me/profile', async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const { displayName, currentPassword, newPassword } = req.body;
+
+  // Retrieve user to check current password if resetting
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user) {
+    res.status(404).json({ success: false, error: 'User not found' });
+    return;
+  }
+
+  const updates: Record<string, any> = { updatedAt: new Date() };
+
+  // 1. Display Name Update
+  if (displayName !== undefined) {
+    updates.displayName = typeof displayName === 'string' ? displayName.trim() || null : null;
+  }
+
+  // 2. Password Update
+  if (newPassword !== undefined && newPassword !== '') {
+    if (!currentPassword) {
+      res.status(400).json({ success: false, error: 'Current password is required to change password' });
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      res.status(400).json({ success: false, error: 'New password must be at least 6 characters' });
+      return;
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ success: false, error: 'Invalid current password' });
+      return;
+    }
+
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '12', 10);
+    updates.passwordHash = await bcrypt.hash(newPassword, saltRounds);
+  }
+
+  // Perform updates
+  const [updatedUser] = await db
+    .update(users)
+    .set(updates)
+    .where(eq(users.id, userId))
+    .returning({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      createdAt: users.createdAt,
+    });
+
+  res.json({
+    success: true,
+    data: {
+      ...updatedUser,
+      createdAt: updatedUser.createdAt.toISOString(),
+    },
+  });
+});
+
+// ─── DELETE /me ── Delete the authenticated user account ──────────
+router.delete('/me', async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+
+  try {
+    // Due to ON DELETE CASCADE (if configured), deleting user might delete logs automatically,
+    // but we can explicitly delete logs just to be safe.
+    await db.delete(activityLogs).where(eq(activityLogs.userId, userId));
+    await db.delete(users).where(eq(users.id, userId));
+
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete account' });
+  }
 });
 
 export default router;

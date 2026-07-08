@@ -8,10 +8,10 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // UTC+5:30
 export function getISTDate(date: Date = new Date()): string {
   const istDate = new Date(date.getTime() + IST_OFFSET_MS);
   
-  // Shift tracking day rollover to 6:00 AM IST.
-  // Any activity logged between 12:00 AM and 5:59 AM IST counts as the previous tracking day.
+  // Shift tracking day rollover to 4:00 AM IST.
+  // Any activity logged between 12:00 AM and 3:59 AM IST counts as the previous tracking day.
   const hours = istDate.getUTCHours();
-  if (hours < 6) {
+  if (hours < 4) {
     istDate.setUTCDate(istDate.getUTCDate() - 1);
   }
   

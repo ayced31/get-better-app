@@ -74,7 +74,9 @@ export const CATEGORIES: Record<string, Category> = {
   sleep: {
     type: 'standard',
     label: 'Sleep',
-    activities: {},
+    activities: {
+      early_sleep: { label: 'Sleeping before 11pm', points: 1 },
+    },
     penalties: {
       doomscrolling: { label: 'Doomscrolling >2hr', points: -2 },
       late_sleep: { label: 'Sleeping after 12', basePoints: -2, compounding: -0.5 },

@@ -55,9 +55,6 @@ export function Landing() {
           </div>
 
           <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/rules')}>
-              Rules
-            </Button>
             <Button variant="secondary" size="sm" onClick={() => navigate('/login')}>
               Sign In
             </Button>
@@ -162,8 +159,8 @@ export function Landing() {
                   >
                     <div className="flex items-center gap-sm">
                       <span className="text-muted" style={{ fontWeight: 600, width: '20px' }}>1</span>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-primary-focus)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>C</div>
-                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Chad</span>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-primary-focus)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>A</div>
+                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Ayce</span>
                       <span className="text-caption" style={{ border: '1px solid var(--color-success)', color: 'var(--color-success)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', fontSize: '10px' }}>Sigma Male</span>
                     </div>
                     <div className="flex items-center gap-md">
@@ -185,8 +182,8 @@ export function Landing() {
                   >
                     <div className="flex items-center gap-sm">
                       <span className="text-muted" style={{ fontWeight: 600, width: '20px' }}>2</span>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>A</div>
-                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Alex</span>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>C</div>
+                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Chad</span>
                       <span className="text-caption" style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', fontSize: '10px' }}>Alpha Male</span>
                     </div>
                     <div className="flex items-center gap-md">
@@ -209,7 +206,7 @@ export function Landing() {
                     <div className="flex items-center gap-sm">
                       <span className="text-muted" style={{ fontWeight: 600, width: '20px' }}>3</span>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-surface-4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>J</div>
-                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Jake</span>
+                      <span className="text-body-sm" style={{ fontWeight: 500 }}>John Doe</span>
                       <span className="text-caption" style={{ border: '1px solid var(--color-ink-subtle)', color: 'var(--color-ink-subtle)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', fontSize: '10px' }}>Boy</span>
                     </div>
                     <div className="flex items-center gap-md">
@@ -275,8 +272,9 @@ export function Landing() {
           backgroundColor: 'var(--color-canvas)',
         }}
       >
-        <div className="container text-caption text-tertiary">
-          Get Better is an invite-only gamified tracker. All times registered in IST.
+        <div className="container flex flex-col gap-xs text-caption text-tertiary">
+          <p>Made with ❤️ by ayce</p>
+          <p>Get Better is an invite-only gamified tracker. All times registered in IST.</p>
         </div>
       </footer>
     </div>

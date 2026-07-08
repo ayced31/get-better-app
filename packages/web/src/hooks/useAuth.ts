@@ -58,3 +58,31 @@ export function useCurrentUser() {
     retry: false,
   });
 }
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  const setUser = useAuthStore((s) => s.setUser);
+
+  return useMutation({
+    mutationFn: (data: { displayName?: string; currentPassword?: string; newPassword?: string }) =>
+      api.patch<User>('/users/me/profile', data),
+    onSuccess: (updatedUser) => {
+      setUser(updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['userStats', 'me'] });
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  const logout = useAuthStore((s) => s.logout);
+
+  return useMutation({
+    mutationFn: () => api.delete<{ deleted: boolean }>('/users/me'),
+    onSuccess: () => {
+      logout();
+      queryClient.clear();
+    },
+  });
+}

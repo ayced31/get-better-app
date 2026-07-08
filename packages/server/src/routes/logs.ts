@@ -131,6 +131,7 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
         updatedAt: log.updatedAt.toISOString(),
       },
       capStatus,
+      ...(result.reason ? { warning: result.reason } : {}),
     },
   });
 });
@@ -166,6 +167,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
 
   // Recalculate points if activity changed
   let newPoints = existingLog.points;
+  let warningMessage: string | undefined = undefined;
   if (category || activity) {
     // Temporarily "remove" the old log from calculations by passing adjusted data
     const result = await calculatePoints(req.userId!, newCategory, newActivity, existingLog.logDate, db);
@@ -174,6 +176,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
       return;
     }
     newPoints = result.points;
+    warningMessage = result.reason;
   }
 
   const [updatedLog] = await db
@@ -199,11 +202,12 @@ router.put('/:id', async (req: AuthRequest, res) => {
         updatedAt: updatedLog.updatedAt.toISOString(),
       },
       capStatus,
+      ...(warningMessage ? { warning: warningMessage } : {}),
     },
   });
 });
 
-// ─── DELETE /:id ── Delete a log (same-day only) ─────────────────
+// ─── DELETE /:id ── Delete a log ─────────────────────────────────
 
 router.delete('/:id', async (req: AuthRequest, res) => {
   const id = req.params.id as string;
@@ -216,15 +220,6 @@ router.delete('/:id', async (req: AuthRequest, res) => {
 
   if (!existingLog) {
     res.status(404).json({ success: false, error: 'Log not found' });
-    return;
-  }
-
-  // Check if deletable (same day in IST)
-  if (!isToday(existingLog.logDate)) {
-    res.status(403).json({
-      success: false,
-      error: 'Logs can only be deleted on the same day (before midnight IST)',
-    });
     return;
   }
 

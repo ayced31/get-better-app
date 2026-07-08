@@ -1,7 +1,8 @@
-// ─── Top Navigation ─────────────────────────────────────────────
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../ui/Avatar';
 import { useAuthStore } from '../../stores/auth';
+import { useSettingsModalStore } from '../../stores/settingsModal';
 import './Nav.css';
 
 const NAV_LINKS = [
@@ -9,7 +10,7 @@ const NAV_LINKS = [
   { to: '/log', label: 'Log', requiresAuth: true },
   { to: '/leaderboard', label: 'Leaderboard', requiresAuth: true },
   { to: '/history', label: 'History', requiresAuth: true },
-  { to: '/rules', label: 'Rules', requiresAuth: false },
+  { to: '/rules', label: 'Rules', requiresAuth: true },
 ];
 
 export function Nav() {
@@ -18,8 +19,25 @@ export function Nav() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const openSettings = useSettingsModalStore((s) => s.open);
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isAuthenticated = token !== null && user !== null;
+
+  // Handle outside clicks to close the dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const visibleLinks = NAV_LINKS.filter(
     (link) => !link.requiresAuth || isAuthenticated
@@ -51,13 +69,13 @@ export function Nav() {
 
         <div className="nav__right">
           {isAuthenticated ? (
-            <>
+            <div className="nav__dropdown-container" ref={dropdownRef}>
               <div
                 className="nav__user"
-                onClick={() => navigate('/profile')}
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/profile')}
+                onKeyDown={(e) => e.key === 'Enter' && setIsDropdownOpen(!isDropdownOpen)}
               >
                 <Avatar
                   src={user?.avatarUrl}
@@ -68,15 +86,39 @@ export function Nav() {
                   {user?.displayName || user?.username}
                 </span>
               </div>
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={logout}
-                title="Sign out"
-                style={{ marginLeft: 'var(--space-xs)' }}
-              >
-                ↗
-              </button>
-            </>
+
+              {isDropdownOpen && (
+                <div className="nav__dropdown">
+                  <button
+                    className="nav__dropdown-item"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      navigate('/profile');
+                    }}
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    className="nav__dropdown-item"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      openSettings();
+                    }}
+                  >
+                    Update Settings
+                  </button>
+                  <button
+                    className="nav__dropdown-item nav__dropdown-item--danger"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      logout();
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
               <Link to="/login" className="btn btn--secondary btn--sm" style={{ padding: '4px 10px', fontSize: 'var(--text-xs)' }}>

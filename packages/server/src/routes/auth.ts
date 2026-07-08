@@ -145,4 +145,38 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
   });
 });
 
+// ─── POST /reset-password ─────────────────────────────────────────
+
+router.post('/reset-password', async (req, res) => {
+  const { email, newPassword } = req.body;
+
+  if (!email || !newPassword) {
+    res.status(400).json({ success: false, error: 'Email and new password are required' });
+    return;
+  }
+
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    return;
+  }
+
+  const [user] = await db.select().from(users).where(eq(users.email, email));
+
+  if (!user) {
+    // Return success anyway to avoid email enumeration
+    res.json({ success: true, data: { message: 'If that email exists, the password has been updated.' } });
+    return;
+  }
+
+  const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '12', 10);
+  const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, user.id));
+
+  res.json({ success: true, data: { message: 'Password updated successfully.' } });
+});
+
 export default router;
