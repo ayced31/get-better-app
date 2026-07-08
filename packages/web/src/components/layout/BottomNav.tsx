@@ -69,6 +69,8 @@ export function BottomNav() {
     (item) => !item.requiresAuth || isAuthenticated
   );
 
+  if (!isAuthenticated) return null;
+
   return (
     <nav className="bottom-nav" aria-label="Mobile navigation">
       <div className="bottom-nav__container">
