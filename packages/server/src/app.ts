@@ -21,13 +21,16 @@ app.use(cors({
     // Automatically allow any Vercel deployments (production or previews)
     const isVercel = /\.vercel\.app$/.test(origin) || origin.endsWith('.vercel.app');
     
-    // Normalize configured CORS_ORIGIN (remove trailing slashes)
-    const configuredOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, '');
+    // Normalize configured CORS_ORIGIN (remove trailing slashes, strip quotes) and support comma-separated list
+    const cleanOriginEnv = (process.env.CORS_ORIGIN ?? '').replace(/^['"]|['"]$/g, '');
+    const configuredOrigins = cleanOriginEnv
+      ? cleanOriginEnv.split(',').map(o => o.trim().replace(/\/$/, ''))
+      : [];
 
-    if (isLocal || isVercel || origin === configuredOrigin) {
+    if (isLocal || isVercel || configuredOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
   credentials: true,
