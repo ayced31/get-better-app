@@ -1,7 +1,7 @@
-import { db } from '../db';
-import { users, activityLogs } from '../db/schema';
+import { db } from '../db/index.js';
+import { users, activityLogs } from '../db/schema.js';
 import { getISTDate, addDay, getDateRange } from '@get-better/shared';
-import { calculatePoints } from './points';
+import { calculatePoints } from './points.js';
 import { and, eq } from 'drizzle-orm';
 
 /**
