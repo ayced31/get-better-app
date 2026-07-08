@@ -4,7 +4,12 @@
 import type { ApiResponse } from '@get-better/shared';
 import { useAuthStore } from '../stores/auth';
 
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+let BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+
+// Auto-append '/api' suffix in production if the user forgot it in VITE_API_URL
+if (BASE_URL.startsWith('http') && !BASE_URL.endsWith('/api')) {
+  BASE_URL = `${BASE_URL.replace(/\/$/, '')}/api`;
+}
 
 class ApiError extends Error {
   status: number;
