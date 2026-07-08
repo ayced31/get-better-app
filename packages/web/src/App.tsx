@@ -1,5 +1,4 @@
-// ─── App Component ────────────────────────────────────────────────
-import { Routes, Route } from 'react-router';
+import { Routes, Route, Navigate } from 'react-router';
 import { useCurrentUser } from './hooks/useAuth';
 import { PageShell } from './components/layout/PageShell';
 import { AuthLayout } from './components/layout/AuthLayout';
@@ -12,8 +11,14 @@ import { LogActivity } from './pages/LogActivity';
 import { Leaderboard } from './pages/Leaderboard';
 import { Profile } from './pages/Profile';
 import { History } from './pages/History';
+import { useAuthStore } from './stores/auth';
 
 import { AlertDialog } from './components/ui/AlertDialog';
+
+function NotFoundRedirect() {
+  const token = useAuthStore((state) => state.token);
+  return <Navigate to={token ? "/dashboard" : "/"} replace />;
+}
 
 export default function App() {
   // Try fetching current user on app mount if JWT is present in local storage
@@ -40,8 +45,12 @@ export default function App() {
             <Route path="/history" element={<History />} />
           </Route>
         </Route>
+
+        {/* Wildcard redirect */}
+        <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
     </>
   );
 }
 // Note: BrowserRouter wraps App in main.tsx
+
