@@ -160,7 +160,7 @@ export function Landing() {
                     <div className="flex items-center gap-sm">
                       <span className="text-muted" style={{ fontWeight: 600, width: '20px' }}>1</span>
                       <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--color-primary-focus)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 600 }}>A</div>
-                      <span className="text-body-sm" style={{ fontWeight: 500 }}>Ayce</span>
+                      <a href="https://github.com/ayced31" target="_blank" rel="noopener noreferrer" className="text-body-sm" style={{ fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>Ayce</a>
                       <span className="text-caption" style={{ border: '1px solid var(--color-success)', color: 'var(--color-success)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', fontSize: '10px' }}>Sigma Male</span>
                     </div>
                     <div className="flex items-center gap-md">
@@ -273,7 +273,7 @@ export function Landing() {
         }}
       >
         <div className="container flex flex-col gap-xs text-caption text-tertiary">
-          <p>Made with ❤️ by ayce</p>
+          <p>Made with ❤️ by <a href="https://github.com/ayced31" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>ayce</a></p>
           <p>Get Better is an invite-only gamified tracker. All times registered in IST.</p>
         </div>
       </footer>
