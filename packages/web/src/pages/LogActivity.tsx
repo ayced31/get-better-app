@@ -51,7 +51,7 @@ export function LogActivity() {
 
   if (isLoading) {
     return (
-      <div className="container p-md flex flex-col gap-lg" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-md flex flex-col gap-lg">
         <Skeleton height="80px" />
         <Skeleton height="300px" />
       </div>
@@ -68,7 +68,7 @@ export function LogActivity() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
       }}
     >
@@ -294,13 +294,9 @@ export function LogActivity() {
                   fullWidth
                   loading={createLog.isPending}
                   onClick={() => {
-                    showConfirm('Are you logging a missed log day penalty?', {
-                      title: 'Log Penalty',
-                      confirmLabel: 'Log Penalty',
-                      onConfirm: () => {
-                        handleToggleLog('daily_log', 'miss', false);
-                      },
-                    });
+                    if (confirm('Are you logging a missed log day penalty?')) {
+                      handleToggleLog('daily_log', 'miss', false);
+                    }
                   }}
                 >
                   Log Missed Log Day

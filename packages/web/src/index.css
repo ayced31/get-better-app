@@ -122,6 +122,34 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   letter-spacing: -0.05px;
+  position: relative;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  top: var(--nav-height);
+  background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(94, 106, 210, 0.22) 0%, transparent 70%);
+}
+
+body::after {
+  bottom: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% 110%, rgba(94, 106, 210, 0.22) 0%, transparent 70%);
+}
+
+@media (max-width: 768px) {
+  body.has-bottom-nav::after {
+    bottom: var(--bottom-nav-height);
+  }
 }
 
 img,

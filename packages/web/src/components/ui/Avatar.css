@@ -50,10 +50,9 @@
   object-fit: cover;
 }
 
-/* Color tints based on initials for variety */
-.avatar--tint-0 { background-color: rgba(94, 106, 210, 0.25); color: #828fff; }
-.avatar--tint-1 { background-color: rgba(39, 166, 68, 0.25); color: #4dd66a; }
-.avatar--tint-2 { background-color: rgba(245, 166, 35, 0.25); color: #ffc865; }
-.avatar--tint-3 { background-color: rgba(229, 72, 77, 0.25); color: #f09093; }
-.avatar--tint-4 { background-color: rgba(130, 143, 255, 0.25); color: #a5b0ff; }
-.avatar--tint-5 { background-color: rgba(100, 200, 180, 0.25); color: #7edbc6; }
+/* Consistent brand theme background for default placeholder avatars */
+.avatar--default-theme {
+  background: radial-gradient(circle at center, rgba(94, 106, 210, 0.16) 0%, rgba(94, 106, 210, 0.04) 100%) !important;
+  color: #a5b0ff !important;
+  border: 1px solid rgba(94, 106, 210, 0.3) !important;
+}

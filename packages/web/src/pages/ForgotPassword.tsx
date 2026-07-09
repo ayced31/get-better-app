@@ -47,11 +47,11 @@ export function ForgotPassword() {
 
   return (
     <div
-      className="flex items-center justify-center p-md fade-in"
+      className="flex items-center justify-center fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
-        paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
-        minHeight: 'calc(100vh - var(--nav-height) - var(--bottom-nav-height) - var(--space-xl) * 2)',
+        minHeight: 'calc(100vh - var(--nav-height) - 80px)',
+        boxSizing: 'border-box',
+        paddingBottom: '8%',
       }}
     >
       <div className="fade-in" style={{ width: '100%', maxWidth: '400px' }}>

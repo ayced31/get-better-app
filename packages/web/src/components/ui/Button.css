@@ -146,3 +146,27 @@
     transform: rotate(360deg);
   }
 }
+
+/* Custom Rank-badge Style Button (Pill Action) */
+.btn--pill-action {
+  border-radius: var(--radius-pill) !important;
+  background-color: var(--color-surface-2) !important;
+  color: var(--color-ink-muted) !important;
+  font-weight: 500 !important;
+  font-size: var(--text-xs) !important;
+  padding: 4px 12px !important;
+  border: 1px solid var(--color-hairline) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.btn--pill-action:hover:not(:disabled) {
+  background-color: var(--color-surface-3) !important;
+  border-color: var(--color-hairline-strong) !important;
+  color: var(--color-ink) !important;
+  transform: translateY(-1px);
+}
+
+.btn--pill-action:active:not(:disabled) {
+  background-color: var(--color-surface-4) !important;
+  transform: translateY(0);
+}

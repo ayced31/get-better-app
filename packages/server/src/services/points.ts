@@ -217,4 +217,128 @@ async function getConsecutivePenaltyDays(
   return count;
 }
 
+export async function recalculateDailyPoints(
+  userId: string,
+  logDate: string,
+  db: Database
+): Promise<void> {
+  // 1. Get all logs for this user on this day, ordered by createdAt ASC
+  const logs = await db
+    .select()
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.logDate, logDate)
+      )
+    )
+    .orderBy(activityLogs.createdAt);
+
+  if (logs.length === 0) return;
+
+  // 2. Check if 8hr study is logged today to determine the positive cap
+  const hasStudied8hr = logs.some((l) => l.activity === 'study_8hr');
+  const dailyCap = hasStudied8hr ? DAILY_POSITIVE_CAP_WITH_8HR_STUDY : DAILY_POSITIVE_CAP;
+
+  let currentPositiveTotal = 0;
+  const categoryCounts: Record<string, number> = {};
+
+  for (const log of logs) {
+    const categoryDef = CATEGORIES[log.category as keyof typeof CATEGORIES];
+    if (!categoryDef) continue;
+
+    // A. Calculate base points (before daily cap constraints)
+    let basePoints = 0;
+
+    if (categoryDef.type === 'standard') {
+      const activityDef = categoryDef.activities[log.activity as keyof typeof categoryDef.activities];
+      const penaltyDef = categoryDef.penalties?.[log.activity];
+
+      if (activityDef) {
+        basePoints = activityDef.points;
+      } else if (penaltyDef) {
+        if ('compounding' in penaltyDef) {
+          const consecutiveDays = await getConsecutivePenaltyDays(userId, log.category, log.activity, logDate, db);
+          basePoints = penaltyDef.basePoints + (penaltyDef.compounding * consecutiveDays);
+        } else {
+          basePoints = penaltyDef.points;
+        }
+      }
+    } else if (categoryDef.type === 'masturbation') {
+      // For masturbation, get the occurrence number up to this log
+      const prevMasturbationLogs = logs.filter(
+        (l) => l.category === 'masturbation' && l.createdAt <= log.createdAt
+      );
+      const monthStart = getMonthStart(logDate);
+      const prevDaysCountResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.userId, userId),
+            eq(activityLogs.category, 'masturbation'),
+            sql`${activityLogs.logDate} >= ${monthStart}`,
+            sql`${activityLogs.logDate} < ${logDate}`
+          )
+        );
+      
+      const prevDaysCount = Number(prevDaysCountResult[0]?.count ?? 0);
+      const positionInToday = prevMasturbationLogs.findIndex((l) => l.id === log.id) + 1;
+      const occurrenceNumber = prevDaysCount + positionInToday;
+
+      if (occurrenceNumber >= 5) {
+        basePoints = 0;
+      } else {
+        const penaltyEntry = categoryDef.penalties.find(
+          (p) => p.occurrence === occurrenceNumber
+        );
+        basePoints = penaltyEntry?.points ?? -9;
+      }
+    } else if (categoryDef.type === 'daily_log') {
+      const penaltyDef = categoryDef.penalties[log.activity];
+      if (penaltyDef) {
+        if ('compounding' in penaltyDef) {
+          const consecutiveDays = await getConsecutivePenaltyDays(userId, log.category, log.activity, logDate, db);
+          basePoints = penaltyDef.basePoints + (penaltyDef.compounding * consecutiveDays);
+        } else {
+          basePoints = (penaltyDef as { points: number }).points;
+        }
+      }
+    }
+
+    // B. Apply category daily cap and global positive daily cap
+    let finalPoints = basePoints;
+
+    if (basePoints > 0) {
+      // Check category daily cap
+      const categoryCount = categoryCounts[log.category] ?? 0;
+      if (categoryDef.maxDaily && categoryCount >= categoryDef.maxDaily) {
+        finalPoints = 0;
+      } else {
+        // Apply global cap
+        const headroom = dailyCap - currentPositiveTotal;
+        if (headroom <= 0) {
+          finalPoints = 0;
+        } else if (basePoints > headroom) {
+          finalPoints = headroom;
+          currentPositiveTotal += headroom;
+          categoryCounts[log.category] = categoryCount + 1;
+        } else {
+          finalPoints = basePoints;
+          currentPositiveTotal += basePoints;
+          categoryCounts[log.category] = categoryCount + 1;
+        }
+      }
+    }
+
+    // C. Update the database if the points calculated now differ from what is stored
+    if (log.points !== finalPoints) {
+      await db
+        .update(activityLogs)
+        .set({ points: finalPoints, updatedAt: new Date() })
+        .where(eq(activityLogs.id, log.id));
+    }
+  }
+}
+
 export { CURRENT_RULES_VERSION };

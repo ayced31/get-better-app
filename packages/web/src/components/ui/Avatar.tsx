@@ -20,23 +20,14 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-function getTintIndex(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash) % 6;
-}
-
 export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) {
   const displayName = name || 'U';
   const initials = getInitials(displayName);
-  const tintIndex = getTintIndex(displayName);
 
   const classes = [
     'avatar',
     `avatar--${size}`,
-    !src && `avatar--tint-${tintIndex}`,
+    !src && 'avatar--default-theme',
     className,
   ]
     .filter(Boolean)

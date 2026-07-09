@@ -25,7 +25,7 @@ export type ActivityLog = {
 export type LeaderboardEntry = {
   user: User;
   totalPoints: number;
-  displayPoints: number; // MAX(0, totalPoints)
+  displayPoints: number;
   rank: string;
   rankEmoji: string;
   todayPoints: number;

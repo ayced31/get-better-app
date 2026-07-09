@@ -18,6 +18,15 @@
 @media (max-width: 768px) {
   .page-shell__main {
     padding: var(--space-md);
+    padding-top: 8vh;
+  }
+  body.has-bottom-nav .page-shell__main {
     padding-bottom: calc(var(--bottom-nav-height) + var(--space-lg));
+  }
+  
+  /* Ensure page content starts exactly 8vh below navbar by zeroing top margins/paddings */
+  .page-shell__main > .container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
   }
 }

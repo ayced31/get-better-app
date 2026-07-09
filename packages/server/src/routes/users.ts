@@ -48,7 +48,7 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
     .where(eq(activityLogs.userId, userId));
 
   const totalPoints = Number(totalResult.total);
-  const displayPoints = Math.max(0, totalPoints);
+  const displayPoints = totalPoints;
   const rank = getRank(totalPoints);
   const progress = getRankProgress(totalPoints);
 

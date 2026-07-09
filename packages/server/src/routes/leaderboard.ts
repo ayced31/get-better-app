@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
   const entries = await Promise.all(
     results.map(async (row) => {
       const rawScore = Number(row.rawScore);
-      const displayPoints = Math.max(0, rawScore);
+      const displayPoints = rawScore;
       const rank = getRank(rawScore);
 
       // Get today's points

@@ -107,7 +107,7 @@ export function History() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
       }}
     >

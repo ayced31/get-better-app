@@ -7,7 +7,7 @@ export function Rules() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
         maxWidth: '800px',
       }}
@@ -26,7 +26,7 @@ export function Rules() {
         <ul className="text-body-sm text-subtle flex flex-col gap-xxs" style={{ listStyleType: 'disc', paddingLeft: 'var(--space-md)' }}>
           <li><strong>Max points in one day:</strong> 5 points default.</li>
           <li><strong>Study bonus cap:</strong> Studying for 8 hours boosts the daily cap to 6 points.</li>
-          <li><strong>Floor limit:</strong> Your overall cumulative score can never fall below 0.</li>
+          <li><strong>Floor limit:</strong> Your overall score can go below 0 (into negative points). Falling into negative territory will degrade your rank to ranks like "Come on son" or "Muthmantri".</li>
           <li><strong>Daily log requirement:</strong> Failing to log at least one activity/penalty in a day results in a -1 base penalty. This penalty compounds by -1 for each consecutive missed day (e.g. -1, -2, -3, ...). If no logs are submitted by 4:00 AM IST of the next calendar day, the miss penalty is automatically registered.</li>
         </ul>
       </Card>

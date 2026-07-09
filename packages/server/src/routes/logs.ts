@@ -5,7 +5,7 @@ import { activityLogs } from '../db/schema.js';
 import { createLogSchema, getISTDate, isToday } from '@get-better/shared';
 import { validate } from '../middleware/validate.js';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
-import { calculatePoints, getDailyCapStatus, CURRENT_RULES_VERSION } from '../services/points.js';
+import { calculatePoints, getDailyCapStatus, recalculateDailyPoints, CURRENT_RULES_VERSION } from '../services/points.js';
 import { backfillMissedDaysForUser } from '../services/backfill.js';
 
 const router = Router();
@@ -90,14 +90,22 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
       })
       .returning();
 
+    // Recalculate all logs for this day
+    await recalculateDailyPoints(req.userId!, logDate, db);
+
+    const [recalculatedLog] = await db
+      .select()
+      .from(activityLogs)
+      .where(eq(activityLogs.id, log.id));
+
     const capStatus = await getDailyCapStatus(req.userId!, logDate, db);
     res.status(201).json({
       success: true,
       data: {
         log: {
-          ...log,
-          createdAt: log.createdAt.toISOString(),
-          updatedAt: log.updatedAt.toISOString(),
+          ...recalculatedLog,
+          createdAt: recalculatedLog.createdAt.toISOString(),
+          updatedAt: recalculatedLog.updatedAt.toISOString(),
         },
         capStatus,
         warning: 'All points have been reset to 0 (5+ monthly occurrences)',
@@ -120,15 +128,26 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
     })
     .returning();
 
+  // Recalculate all logs for this day
+  await recalculateDailyPoints(req.userId!, logDate, db);
+
+  // Trigger backfill/auto-penalties calculation
+  await backfillMissedDaysForUser(req.userId!);
+
+  const [recalculatedLog] = await db
+    .select()
+    .from(activityLogs)
+    .where(eq(activityLogs.id, log.id));
+
   const capStatus = await getDailyCapStatus(req.userId!, logDate, db);
 
   res.status(201).json({
     success: true,
     data: {
       log: {
-        ...log,
-        createdAt: log.createdAt.toISOString(),
-        updatedAt: log.updatedAt.toISOString(),
+        ...recalculatedLog,
+        createdAt: recalculatedLog.createdAt.toISOString(),
+        updatedAt: recalculatedLog.updatedAt.toISOString(),
       },
       capStatus,
       ...(result.reason ? { warning: result.reason } : {}),
@@ -191,15 +210,26 @@ router.put('/:id', async (req: AuthRequest, res) => {
     .where(eq(activityLogs.id, id))
     .returning();
 
+  // Recalculate all logs for this day
+  await recalculateDailyPoints(req.userId!, existingLog.logDate, db);
+
+  // Trigger backfill/auto-penalties calculation
+  await backfillMissedDaysForUser(req.userId!);
+
+  const [recalculatedLog] = await db
+    .select()
+    .from(activityLogs)
+    .where(eq(activityLogs.id, id));
+
   const capStatus = await getDailyCapStatus(req.userId!, existingLog.logDate, db);
 
   res.json({
     success: true,
     data: {
       log: {
-        ...updatedLog,
-        createdAt: updatedLog.createdAt.toISOString(),
-        updatedAt: updatedLog.updatedAt.toISOString(),
+        ...recalculatedLog,
+        createdAt: recalculatedLog.createdAt.toISOString(),
+        updatedAt: recalculatedLog.updatedAt.toISOString(),
       },
       capStatus,
       ...(warningMessage ? { warning: warningMessage } : {}),
@@ -224,6 +254,12 @@ router.delete('/:id', async (req: AuthRequest, res) => {
   }
 
   await db.delete(activityLogs).where(eq(activityLogs.id, id));
+
+  // Recalculate all logs for this day
+  await recalculateDailyPoints(req.userId!, existingLog.logDate, db);
+
+  // Trigger backfill/auto-penalties calculation
+  await backfillMissedDaysForUser(req.userId!);
 
   const capStatus = await getDailyCapStatus(req.userId!, existingLog.logDate, db);
 

@@ -16,7 +16,7 @@ export function Profile() {
 
   if (isLoading) {
     return (
-      <div className="container p-md flex flex-col gap-lg" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-md flex flex-col gap-lg">
         <Skeleton height="150px" />
         <Skeleton height="200px" />
         <Skeleton height="300px" />
@@ -26,7 +26,7 @@ export function Profile() {
 
   if (error || !stats) {
     return (
-      <div className="container p-lg text-center" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-lg text-center">
         <p className="text-danger">Failed to load user profile.</p>
       </div>
     );
@@ -47,7 +47,7 @@ export function Profile() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
       }}
     >

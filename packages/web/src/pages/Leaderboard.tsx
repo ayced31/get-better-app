@@ -113,7 +113,7 @@ export function Leaderboard() {
 
   if (isLoading) {
     return (
-      <div className="container p-md flex flex-col gap-lg" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-md flex flex-col gap-lg">
         <Skeleton height="50px" />
         <Skeleton height="400px" />
       </div>
@@ -122,7 +122,7 @@ export function Leaderboard() {
 
   if (error) {
     return (
-      <div className="container p-lg text-center" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-lg text-center">
         <p className="text-danger">Failed to load leaderboard data.</p>
       </div>
     );
@@ -132,7 +132,7 @@ export function Leaderboard() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
       }}
     >

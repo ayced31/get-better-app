@@ -23,7 +23,7 @@ function getGreeting() {
 export function Dashboard() {
   const navigate = useNavigate();
   const { data: stats, isLoading, error } = useUserStats('me');
-  const { data: leaderboardEntries = [], isLoading: isLbLoading } = useLeaderboard('all');
+  const { data: leaderboardEntries = [], isLoading: isLbLoading } = useLeaderboard('today');
   const deleteLog = useDeleteLog();
   const { showAlert, showConfirm } = useAlertStore();
 
@@ -43,7 +43,7 @@ export function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="container p-md flex flex-col gap-lg" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-md flex flex-col gap-lg">
         <Skeleton height="150px" />
         <Skeleton height="200px" />
         <Skeleton height="300px" />
@@ -53,7 +53,7 @@ export function Dashboard() {
 
   if (error || !stats) {
     return (
-      <div className="container p-lg text-center" style={{ marginTop: 'var(--nav-height)' }}>
+      <div className="container p-lg text-center">
         <p className="text-danger">Failed to load dashboard data. Please try again later.</p>
       </div>
     );
@@ -75,7 +75,7 @@ export function Dashboard() {
     <div
       className="container p-md flex flex-col gap-lg fade-in"
       style={{
-        marginTop: 'calc(var(--nav-height) + var(--space-md))',
+        marginTop: 'var(--space-md)',
         paddingBottom: 'calc(var(--bottom-nav-height) + var(--space-xl))',
       }}
     >
@@ -136,8 +136,14 @@ export function Dashboard() {
               <Button
                 size="sm"
                 variant="ghost"
+                className="btn--pill-action"
                 onClick={() => navigate('/log')}
-                style={{ padding: '0 var(--space-xs)' }}
+                icon={
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                }
               >
                 Log Activity
               </Button>
@@ -370,14 +376,17 @@ export function Dashboard() {
           {/* Leaderboard Widget */}
           <div className="flex flex-col gap-md">
             <div className="flex justify-between items-center">
-              <h2 className="text-card-title">Leaderboard</h2>
+              <h2 className="text-card-title">Leaderboard (Today)</h2>
               <Button
                 size="sm"
                 variant="ghost"
+                className="btn--pill-action"
                 onClick={() => navigate('/leaderboard')}
-                style={{ padding: '0 var(--space-xs)' }}
               >
                 View Full
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ marginLeft: '4px', display: 'inline-block', verticalAlign: 'middle' }}>
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
               </Button>
             </div>
             <Card className="p-md flex flex-col gap-sm" style={{ minHeight: '200px' }}>

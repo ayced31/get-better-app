@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router';
 import { useCurrentUser } from './hooks/useAuth';
 import { PageShell } from './components/layout/PageShell';
@@ -25,6 +26,18 @@ function NotFoundRedirect() {
 export default function App() {
   // Try fetching current user on app mount if JWT is present in local storage
   useCurrentUser();
+
+  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = token !== null && user !== null;
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      document.body.classList.add('has-bottom-nav');
+    } else {
+      document.body.classList.remove('has-bottom-nav');
+    }
+  }, [isAuthenticated]);
 
   return (
     <>
