@@ -1,4 +1,5 @@
 // ─── Points Display ─────────────────────────────────────────────
+import { formatPoints } from '@get-better/shared';
 import './PointsDisplay.css';
 
 type PointsSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -27,7 +28,7 @@ export function PointsDisplay({
         ? 'points-display__value--negative'
         : 'points-display__value--zero';
 
-  const displayValue = showSign && points > 0 ? `+${points}` : `${points}`;
+  const displayValue = showSign && points > 0 ? `+${formatPoints(points)}` : `${formatPoints(points)}`;
 
   const classes = [
     'points-display',

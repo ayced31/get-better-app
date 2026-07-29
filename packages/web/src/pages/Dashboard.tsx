@@ -11,7 +11,7 @@ import { StreakIndicator } from '../components/features/StreakIndicator';
 import { PointsDisplay } from '../components/features/PointsDisplay';
 import { LeaderboardRow } from '../components/features/LeaderboardRow';
 import { Skeleton } from '../components/ui/Skeleton';
-import { CATEGORIES } from '@get-better/shared';
+import { CATEGORIES, formatPoints, formatPointsSigned } from '@get-better/shared';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -187,12 +187,12 @@ export function Dashboard() {
                       <div className="flex flex-col items-end">
                         {hasPositive && (
                           <span className="text-body-sm" style={{ color: 'var(--color-success)', fontWeight: 600 }}>
-                            +{positivePoints}
+                            +{formatPoints(positivePoints)}
                           </span>
                         )}
                         {hasPenalty && (
                           <span className="text-body-sm" style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
-                            {penaltyPoints}
+                            {formatPoints(penaltyPoints)}
                           </span>
                         )}
                         {isEmpty && (
@@ -225,7 +225,7 @@ export function Dashboard() {
                     color: todayPoints >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
                   }}
                 >
-                  {todayPoints >= 0 ? `+${todayPoints}` : todayPoints}
+                  {formatPointsSigned(todayPoints)}
                 </span>
               </div>
             </div>
@@ -256,10 +256,8 @@ export function Dashboard() {
                           catDef.activities[log.activity]?.label ||
                           catDef.penalties?.[log.activity]?.label ||
                           log.activity;
-                      } else if (catDef.type === 'masturbation') {
-                        activityLabel = 'Masturbation Penalty';
-                      } else if (catDef.type === 'daily_log') {
-                        activityLabel = 'Daily Log Penalty';
+                      } else if (catDef.type === 'retention') {
+                        activityLabel = log.activity === 'slip' ? 'Retention Slip' : 'Retention Milestone';
                       }
                     }
 
@@ -293,7 +291,7 @@ export function Dashboard() {
                                 : 'var(--color-ink-subtle)',
                             }}
                           >
-                            {log.points > 0 ? `+${log.points}` : log.points}
+                            {formatPointsSigned(log.points)}
                           </span>
                           <button
                             onClick={() => handleDeleteLog(log.id)}
@@ -406,6 +404,7 @@ export function Dashboard() {
                       entry={entry}
                       position={index + 1}
                       isCurrentUser={entry.user.id === stats?.user?.id}
+                      showStreak={false}
                     />
                   ))}
                 </div>

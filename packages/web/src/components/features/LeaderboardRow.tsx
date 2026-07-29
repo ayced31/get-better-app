@@ -1,5 +1,6 @@
 // ─── Leaderboard Row ────────────────────────────────────────────
 import type { LeaderboardEntry } from '@get-better/shared';
+import { formatPoints } from '@get-better/shared';
 import { RankBadge } from './RankBadge';
 import { StreakIndicator } from './StreakIndicator';
 import './LeaderboardRow.css';
@@ -9,6 +10,7 @@ interface LeaderboardRowProps {
   position: number;
   isCurrentUser: boolean;
   className?: string;
+  showStreak?: boolean;
   onClick?: () => void;
 }
 
@@ -17,6 +19,7 @@ export function LeaderboardRow({
   position,
   isCurrentUser,
   className = '',
+  showStreak = true,
   onClick,
 }: LeaderboardRowProps) {
   const classes = [
@@ -53,10 +56,12 @@ export function LeaderboardRow({
       </div>
 
       <div className="lb-row__meta">
-        <div className="lb-row__streak-wrap">
-          <StreakIndicator streak={entry.streak} showLabel={false} />
-        </div>
-        <div className="lb-row__points">{entry.displayPoints}</div>
+        {showStreak && (
+          <div className="lb-row__streak-wrap">
+            <StreakIndicator streak={entry.streak} showLabel={false} />
+          </div>
+        )}
+        <div className="lb-row__points">{formatPoints(entry.displayPoints)}</div>
       </div>
     </div>
   );

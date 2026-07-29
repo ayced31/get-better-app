@@ -30,6 +30,13 @@ export type LeaderboardEntry = {
   rankEmoji: string;
   todayPoints: number;
   streak: number;
+  previousSeasonRank?: string | null;
+};
+
+export type RetentionStatus = {
+  currentStageDays: number;
+  currentStagePoints: number;
+  claimedMilestones: { days: number; points: number; claimedAt: string }[];
 };
 
 export type UserStats = {
@@ -51,12 +58,14 @@ export type UserStats = {
     missesCount: number;
     lateSleepCount: number;
   };
+  previousSeasonRank?: string | null;
 };
 
 export type DailyCapStatus = {
   globalPositiveUsed: number;
   globalPositiveCap: number;
   categoryCaps: Record<string, { used: number; cap: number | null }>;
+  hasStudied6hr: boolean;
   hasStudied8hr: boolean;
 };
 
@@ -80,4 +89,9 @@ export type LogResponse = {
   log: ActivityLog;
   capStatus: DailyCapStatus;
   warning?: string;
+  streakBonus?: {
+    type: '7pt' | '8pt';
+    bonus: number;
+    message: string;
+  };
 };

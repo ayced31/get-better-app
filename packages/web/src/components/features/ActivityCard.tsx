@@ -1,4 +1,5 @@
 // ─── Activity Card ──────────────────────────────────────────────
+import { formatPointsSigned } from '@get-better/shared';
 import './ActivityCard.css';
 
 interface ActivityCardProps {
@@ -50,7 +51,7 @@ export function ActivityCard({
       </div>
       <div className="activity-card__right">
         <span className={`activity-card__points ${pointsClass}`}>
-          {points > 0 ? `+${points}` : points}
+          {formatPointsSigned(points)}
         </span>
       </div>
     </div>

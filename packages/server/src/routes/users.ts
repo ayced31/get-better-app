@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { users, activityLogs } from '../db/schema.js';
-import { getISTDate, getRank, getRankProgress, getMonthStart, getMonthEnd } from '@get-better/shared';
+import { getISTDate, getRank, getRankProgress, getMonthStart, getMonthEnd, getCurrentSeason, subtractDay } from '@get-better/shared';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 import { calculateStreak } from '../services/streaks.js';
 import { backfillMissedDaysForUser } from '../services/backfill.js';
@@ -18,86 +18,102 @@ router.use(authMiddleware);
 router.get('/:id/stats', async (req: AuthRequest, res) => {
   const userId = (req.params.id === 'me' ? req.userId! : req.params.id) as string;
 
-  // Get user
-  const [user] = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      email: users.email,
-      displayName: users.displayName,
-      avatarUrl: users.avatarUrl,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(eq(users.id, userId));
+  // Run backfill (throttled inside backfillMissedDaysForUser)
+  await backfillMissedDaysForUser(userId);
 
+  const today = getISTDate();
+  const currentSeason = getCurrentSeason();
+  const targetMonthStr = typeof req.query.month === 'string' ? req.query.month + '-01' : today;
+  const monthStart = getMonthStart(targetMonthStr);
+  const monthEnd = getMonthEnd(targetMonthStr);
+
+  // Execute independent queries in parallel via Promise.all
+  const [
+    userResult,
+    totalResult,
+    streak,
+    todayLogs,
+    monthlyRawLogs,
+    prevTotalResult,
+  ] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId)),
+
+    db
+      .select({
+        total: sql<number>`COALESCE(SUM(${activityLogs.points}), 0)`,
+      })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.userId, userId),
+          sql`${activityLogs.logDate} >= ${currentSeason.seasonStart}`
+        )
+      ),
+
+    calculateStreak(userId, db),
+
+    db
+      .select()
+      .from(activityLogs)
+      .where(and(eq(activityLogs.userId, userId), eq(activityLogs.logDate, today)))
+      .orderBy(desc(activityLogs.createdAt)),
+
+    db
+      .select()
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.userId, userId),
+          sql`${activityLogs.logDate} >= ${monthStart}`,
+          sql`${activityLogs.logDate} <= ${monthEnd}`
+        )
+      ),
+
+    currentSeason.seasonNumber > 1
+      ? db
+          .select({
+            total: sql<number>`COALESCE(SUM(${activityLogs.points}), 0)`,
+          })
+          .from(activityLogs)
+          .where(
+            and(
+              eq(activityLogs.userId, userId),
+              sql`${activityLogs.logDate} >= ${getCurrentSeason(subtractDay(currentSeason.seasonStart)).seasonStart}`,
+              sql`${activityLogs.logDate} <= ${getCurrentSeason(subtractDay(currentSeason.seasonStart)).seasonEnd}`
+            )
+          )
+      : Promise.resolve([{ total: 0 }]),
+  ]);
+
+  const user = userResult[0];
   if (!user) {
     res.status(404).json({ success: false, error: 'User not found' });
     return;
   }
 
-  // Run backfill first to keep streaks and cumulative scores accurate
-  await backfillMissedDaysForUser(userId);
-
-  // Get total points (all time)
-  const [totalResult] = await db
-    .select({
-      total: sql<number>`COALESCE(SUM(${activityLogs.points}), 0)`,
-    })
-    .from(activityLogs)
-    .where(eq(activityLogs.userId, userId));
-
-  const totalPoints = Number(totalResult.total);
+  const totalPoints = Number(totalResult[0]?.total ?? 0);
   const displayPoints = totalPoints;
   const rank = getRank(totalPoints);
   const progress = getRankProgress(totalPoints);
-
-  // Get streak
-  const streak = await calculateStreak(userId, db);
-
-  // Get today's data
-  const today = getISTDate();
-  const todayLogs = await db
-    .select()
-    .from(activityLogs)
-    .where(and(eq(activityLogs.userId, userId), eq(activityLogs.logDate, today)))
-    .orderBy(desc(activityLogs.createdAt));
-
   const todayPoints = todayLogs.reduce((sum, l) => sum + l.points, 0);
 
-  // Get monthly breakdown (current or specified month)
-  const targetMonthStr = typeof req.query.month === 'string' ? req.query.month + '-01' : today;
-  const monthStart = getMonthStart(targetMonthStr);
-  const monthEnd = getMonthEnd(targetMonthStr);
+  let previousSeasonRank = null;
+  if (currentSeason.seasonNumber > 1) {
+    previousSeasonRank = getRank(Number(prevTotalResult[0]?.total ?? 0)).name;
+  }
 
-  const monthlyLogs = await db
-    .select({
-      date: activityLogs.logDate,
-      points: sql<number>`SUM(${activityLogs.points})`,
-    })
-    .from(activityLogs)
-    .where(
-      and(
-        eq(activityLogs.userId, userId),
-        sql`${activityLogs.logDate} >= ${monthStart}`,
-        sql`${activityLogs.logDate} <= ${monthEnd}`
-      )
-    )
-    .groupBy(activityLogs.logDate)
-    .orderBy(activityLogs.logDate);
-
-  // Fetch raw logs for this month to calculate detailed statistics
-  const monthlyRawLogs = await db
-    .select()
-    .from(activityLogs)
-    .where(
-      and(
-        eq(activityLogs.userId, userId),
-        sql`${activityLogs.logDate} >= ${monthStart}`,
-        sql`${activityLogs.logDate} <= ${monthEnd}`
-      )
-    );
-
+  // Calculate monthly breakdown and statistics in-memory from monthlyRawLogs
+  const monthlyPointsByDate = new Map<string, number>();
   let workoutCount = 0;
   let studyHours = 0;
   let slipsCount = 0;
@@ -105,24 +121,32 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
   let lateSleepCount = 0;
 
   for (const log of monthlyRawLogs) {
-    if (log.category === 'physical' && ['gym', 'steps_10k', 'yoga'].includes(log.activity)) {
+    const currentSum = monthlyPointsByDate.get(log.logDate) || 0;
+    monthlyPointsByDate.set(log.logDate, currentSum + log.points);
+
+    if (log.category === 'physical' && ['gym', 'steps_10k', 'running_3km', 'calisthenics'].includes(log.activity)) {
       workoutCount++;
     }
     if (log.category === 'study') {
       if (log.activity === 'study_2hr') studyHours += 2;
       else if (log.activity === 'study_4hr') studyHours += 4;
+      else if (log.activity === 'study_6hr') studyHours += 6;
       else if (log.activity === 'study_8hr') studyHours += 8;
     }
-    if (log.category === 'masturbation') {
+    if (log.category === 'retention' || log.category === 'masturbation') {
       slipsCount++;
     }
     if (log.category === 'daily_log' && log.activity === 'miss') {
       missesCount++;
     }
-    if (log.category === 'sleep' && log.activity === 'late_sleep') {
+    if (log.category === 'sleep' && log.activity === 'sleep_after_3am') {
       lateSleepCount++;
     }
   }
+
+  const monthlyBreakdown = Array.from(monthlyPointsByDate.entries())
+    .map(([date, points]) => ({ date, points }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   res.json({
     success: true,
@@ -134,6 +158,7 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
       rankEmoji: rank.emoji,
       rankProgress: progress.progress,
       nextRank: progress.next?.name ?? null,
+      previousSeasonRank,
       streak,
       todayPoints,
       todayLogs: todayLogs.map((l) => ({
@@ -141,10 +166,7 @@ router.get('/:id/stats', async (req: AuthRequest, res) => {
         createdAt: l.createdAt.toISOString(),
         updatedAt: l.updatedAt.toISOString(),
       })),
-      monthlyBreakdown: monthlyLogs.map((l) => ({
-        date: l.date,
-        points: Number(l.points),
-      })),
+      monthlyBreakdown,
       monthlyStats: {
         workoutCount,
         studyHours,
@@ -226,8 +248,6 @@ router.delete('/me', async (req: AuthRequest, res) => {
   const userId = req.userId!;
 
   try {
-    // Due to ON DELETE CASCADE (if configured), deleting user might delete logs automatically,
-    // but we can explicitly delete logs just to be safe.
     await db.delete(activityLogs).where(eq(activityLogs.userId, userId));
     await db.delete(users).where(eq(users.id, userId));
 

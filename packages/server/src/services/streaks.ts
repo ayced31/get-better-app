@@ -1,18 +1,23 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
 import { activityLogs } from '../db/schema.js';
 import { getISTDate, subtractDay } from '@get-better/shared';
 import type { Database } from '../db/index.js';
+import { CURRENT_RULES_VERSION } from './points.js';
 
 /**
  * Calculate the current streak for a user.
  * A streak is the number of consecutive days (backwards from today) with ≥1 log.
  */
 export async function calculateStreak(userId: string, db: Database): Promise<number> {
-  // Get all distinct dates where user has ≥1 log, ordered descending
   const logDates = await db
     .selectDistinct({ date: activityLogs.logDate })
     .from(activityLogs)
-    .where(eq(activityLogs.userId, userId))
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
+      )
+    )
     .orderBy(desc(activityLogs.logDate));
 
   if (logDates.length === 0) return 0;
@@ -28,7 +33,6 @@ export async function calculateStreak(userId: string, db: Database): Promise<num
       // Gap found — streak broken
       break;
     }
-    // If row.date > expected, skip (future dates shouldn't exist but be safe)
   }
 
   return streak;
@@ -53,7 +57,8 @@ export async function calculateMonthlyLogStreak(
       and(
         eq(activityLogs.userId, userId),
         sql`${activityLogs.logDate} >= ${monthStart}`,
-        sql`${activityLogs.logDate} <= ${today}`
+        sql`${activityLogs.logDate} <= ${today}`,
+        sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
       )
     )
     .orderBy(desc(activityLogs.logDate));
@@ -67,7 +72,6 @@ export async function calculateMonthlyLogStreak(
     if (row.date === expected) {
       streak++;
       expected = subtractDay(expected);
-      // Don't go past month boundary
       if (expected < monthStart) break;
     } else {
       break;
@@ -75,4 +79,98 @@ export async function calculateMonthlyLogStreak(
   }
 
   return streak;
+}
+
+export async function checkHighScoreStreak(
+  userId: string,
+  logDate: string,
+  db: Database
+): Promise<{ awarded: boolean; bonus: number; type: '7pt' | '8pt' | null }> {
+  // Looks back 6 days from logDate (inclusive)
+  let startDate = logDate;
+  for (let i = 0; i < 5; i++) {
+    startDate = subtractDay(startDate);
+  }
+
+  const logs = await db
+    .select({
+      logDate: activityLogs.logDate,
+      points: activityLogs.points,
+    })
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        sql`${activityLogs.logDate} >= ${startDate}`,
+        sql`${activityLogs.logDate} <= ${logDate}`
+      )
+    );
+
+  const dailyPoints: Record<string, number> = {};
+  for (const log of logs) {
+    dailyPoints[log.logDate] = (dailyPoints[log.logDate] || 0) + log.points;
+  }
+
+  let all8pt = true;
+  let all7pt = true;
+
+  let checkDate = logDate;
+  for (let i = 0; i < 6; i++) {
+    const pts = dailyPoints[checkDate] || 0;
+    if (pts < 8) all8pt = false;
+    if (pts < 7) all7pt = false;
+    checkDate = subtractDay(checkDate);
+  }
+
+  if (!all7pt && !all8pt) {
+    return { awarded: false, bonus: 0, type: null };
+  }
+
+  const type = all8pt ? '8pt' : '7pt';
+  const bonus = all8pt ? 4 : 2;
+  const activityStr = all8pt ? 'high_score_8pt' : 'high_score_7pt';
+
+  // Check for duplicate bonuses
+  const existing = await db
+    .select()
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.logDate, logDate),
+        eq(activityLogs.category, 'streak_bonus')
+      )
+    );
+
+  if (existing.length > 0) {
+    const currentBonus = existing[0];
+    if (currentBonus.activity === activityStr) {
+      // Already awarded this exact one
+      return { awarded: false, bonus: 0, type: null };
+    } else {
+      // Upgrading from 7pt to 8pt or vice versa
+      await db
+        .update(activityLogs)
+        .set({
+          activity: activityStr,
+          points: bonus,
+          updatedAt: new Date()
+        })
+        .where(eq(activityLogs.id, currentBonus.id));
+      
+      return { awarded: true, bonus, type };
+    }
+  }
+
+  // Insert new bonus
+  await db.insert(activityLogs).values({
+    userId,
+    logDate,
+    category: 'streak_bonus',
+    activity: activityStr,
+    points: bonus,
+    rulesVersion: CURRENT_RULES_VERSION,
+  });
+
+  return { awarded: true, bonus, type };
 }

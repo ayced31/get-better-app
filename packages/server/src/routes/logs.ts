@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate.js';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 import { calculatePoints, getDailyCapStatus, recalculateDailyPoints, CURRENT_RULES_VERSION } from '../services/points.js';
 import { backfillMissedDaysForUser } from '../services/backfill.js';
+import { checkHighScoreStreak } from '../services/streaks.js';
 
 const router = Router();
 
@@ -74,45 +75,7 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
     return;
   }
 
-  // Handle masturbation 5+ reset (special case)
-  if (result.reason === 'reset_all_points') {
-    // Log the event with 0 points, but signal to frontend
-    const [log] = await db
-      .insert(activityLogs)
-      .values({
-        userId: req.userId!,
-        logDate,
-        category,
-        activity,
-        points: 0,
-        rulesVersion: CURRENT_RULES_VERSION,
-        metadata: { ...(metadata ?? {}), resetAllPoints: true },
-      })
-      .returning();
 
-    // Recalculate all logs for this day
-    await recalculateDailyPoints(req.userId!, logDate, db);
-
-    const [recalculatedLog] = await db
-      .select()
-      .from(activityLogs)
-      .where(eq(activityLogs.id, log.id));
-
-    const capStatus = await getDailyCapStatus(req.userId!, logDate, db);
-    res.status(201).json({
-      success: true,
-      data: {
-        log: {
-          ...recalculatedLog,
-          createdAt: recalculatedLog.createdAt.toISOString(),
-          updatedAt: recalculatedLog.updatedAt.toISOString(),
-        },
-        capStatus,
-        warning: 'All points have been reset to 0 (5+ monthly occurrences)',
-      },
-    });
-    return;
-  }
 
   // Create the log
   const [log] = await db
@@ -134,6 +97,8 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
   // Trigger backfill/auto-penalties calculation
   await backfillMissedDaysForUser(req.userId!);
 
+  const streakBonus = await checkHighScoreStreak(req.userId!, logDate, db);
+
   const [recalculatedLog] = await db
     .select()
     .from(activityLogs)
@@ -150,6 +115,7 @@ router.post('/', validate(createLogSchema), async (req: AuthRequest, res) => {
         updatedAt: recalculatedLog.updatedAt.toISOString(),
       },
       capStatus,
+      ...(streakBonus.awarded ? { streakBonus } : {}),
       ...(result.reason ? { warning: result.reason } : {}),
     },
   });

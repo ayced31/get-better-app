@@ -1,12 +1,12 @@
 // ─── Leaderboard Page ──────────────────────────────────────────────
 import { useState } from 'react';
-import { useLeaderboard, type LeaderboardPeriod } from '../hooks/useLeaderboard';
+import { useLeaderboard, useSeasonInfo, type LeaderboardPeriod } from '../hooks/useLeaderboard';
 import { useAuthStore } from '../stores/auth';
 import { Card } from '../components/ui/Card';
 import { LeaderboardRow } from '../components/features/LeaderboardRow';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useUserStats } from '../hooks/useUserStats';
-import { CATEGORIES } from '@get-better/shared';
+import { CATEGORIES, formatPoints, formatPointsSigned } from '@get-better/shared';
 import { RankBadge } from '../components/features/RankBadge';
 import { StreakIndicator } from '../components/features/StreakIndicator';
 
@@ -22,9 +22,16 @@ function UserPointsModal({ userId, onClose }: { userId: string; onClose: () => v
               {isLoading ? 'Loading...' : stats?.user?.displayName || stats?.user?.username}
             </h2>
             {!isLoading && stats && (
-              <div className="flex items-center gap-sm mt-xs">
-                <RankBadge rankName={stats.rank} rankEmoji={stats.rankEmoji} size="sm" />
-                <StreakIndicator streak={stats.streak} />
+              <div className="flex flex-col gap-xs mt-xs">
+                <div className="flex items-center gap-sm">
+                  <RankBadge rankName={stats.rank} rankEmoji={stats.rankEmoji} size="sm" />
+                  <StreakIndicator streak={stats.streak} />
+                </div>
+                {stats.previousSeasonRank && (
+                  <span className="text-caption text-tertiary">
+                    Last season: <strong>{stats.previousSeasonRank}</strong>
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -51,7 +58,7 @@ function UserPointsModal({ userId, onClose }: { userId: string; onClose: () => v
           ) : (
             <div className="flex flex-col items-center" style={{ width: '100%' }}>
               <span className="text-display-lg" style={{ color: 'var(--color-primary)' }}>
-                {stats?.todayPoints ?? 0}
+                {formatPoints(stats?.todayPoints ?? 0)}
               </span>
               <span className="text-caption text-muted uppercase tracking-wider mb-md">
                 Points Today
@@ -79,7 +86,7 @@ function UserPointsModal({ userId, onClose }: { userId: string; onClose: () => v
                       <div key={log.id} className="flex justify-between items-center p-sm" style={{ backgroundColor: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', width: '100%' }}>
                         <span className="text-body-sm">{label}</span>
                         <span className={`text-body-sm ${log.points > 0 ? 'text-success' : log.points < 0 ? 'text-danger' : 'text-muted'}`} style={{ fontWeight: 600 }}>
-                          {log.points > 0 ? `+${log.points}` : log.points}
+                          {formatPointsSigned(log.points)}
                         </span>
                       </div>
                     );
@@ -102,6 +109,7 @@ export function Leaderboard() {
   const [period, setPeriod] = useState<LeaderboardPeriod>('all');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { data: entries = [], isLoading, error } = useLeaderboard(period);
+  const seasonInfo = useSeasonInfo();
   const currentUser = useAuthStore((s) => s.user);
 
   const periods: { value: LeaderboardPeriod; label: string }[] = [
@@ -142,6 +150,14 @@ export function Leaderboard() {
           Compete with your close friends. The board for 'Today' resets at midnight IST.
         </p>
       </div>
+
+      <Card className="p-sm flex justify-between items-center" style={{ backgroundColor: 'var(--color-surface-2)' }}>
+        <div className="flex items-center gap-sm">
+          <span className="text-body-sm" style={{ fontWeight: 600 }}>Season {seasonInfo.seasonNumber}</span>
+          <span className="text-caption text-tertiary">|</span>
+          <span className="text-caption text-tertiary">{seasonInfo.daysRemaining} days remaining</span>
+        </div>
+      </Card>
 
       {/* ─── Period Selector Tabs ─── */}
       <div

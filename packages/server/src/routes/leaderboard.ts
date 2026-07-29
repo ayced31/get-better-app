@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, sql, and, gte, lte } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { users, activityLogs } from '../db/schema.js';
-import { getISTDate, subtractDay, getRank } from '@get-better/shared';
+import { getISTDate, subtractDay, getRank, getCurrentSeason } from '@get-better/shared';
 import { authMiddleware } from '../middleware/auth.js';
 import { calculateStreak } from '../services/streaks.js';
 import { backfillAllUsers } from '../services/backfill.js';
@@ -14,7 +14,7 @@ router.use(authMiddleware);
 // ─── GET / ── Leaderboard ────────────────────────────────────────
 
 router.get('/', async (req, res) => {
-  // Batch run backfill for all users first so standings are always up to date
+  // Run backfill (throttled inside backfillAllUsers)
   await backfillAllUsers();
 
   const period = (req.query.period as string) ?? 'all';
@@ -38,12 +38,17 @@ router.get('/', async (req, res) => {
       startDate = today.substring(0, 7) + '-01';
       break;
     case 'all':
-    default:
-      startDate = '2000-01-01';
+    default: {
+      const season = getCurrentSeason();
+      startDate = season.seasonStart;
+      if (season.seasonEnd && season.seasonEnd < today) {
+        endDate = season.seasonEnd;
+      }
       break;
+    }
   }
 
-  // Aggregate points per user
+  // Aggregate points per user AND today's points in a SINGLE query
   const results = await db
     .select({
       id: users.id,
@@ -53,6 +58,7 @@ router.get('/', async (req, res) => {
       avatarUrl: users.avatarUrl,
       createdAt: users.createdAt,
       rawScore: sql<number>`COALESCE(SUM(${activityLogs.points}), 0)`.as('raw_score'),
+      todayScore: sql<number>`COALESCE(SUM(CASE WHEN ${activityLogs.logDate} = ${today} THEN ${activityLogs.points} ELSE 0 END), 0)`.as('today_score'),
       firstEntryTime: sql<string | null>`MIN(${activityLogs.createdAt})`.as('first_entry_time'),
     })
     .from(users)
@@ -67,46 +73,35 @@ router.get('/', async (req, res) => {
     .groupBy(users.id)
     .orderBy(sql`raw_score DESC`);
 
-  // Get today's points and streaks for each user
-  const entries = await Promise.all(
-    results.map(async (row) => {
-      const rawScore = Number(row.rawScore);
-      const displayPoints = rawScore;
-      const rank = getRank(rawScore);
-
-      // Get today's points
-      const todayLogs = await db
-        .select({ points: activityLogs.points })
-        .from(activityLogs)
-        .where(
-          and(
-            eq(activityLogs.userId, row.id),
-            eq(activityLogs.logDate, today)
-          )
-        );
-      const todayPoints = todayLogs.reduce((sum, l) => sum + l.points, 0);
-
-      const streak = await calculateStreak(row.id, db);
-
-      return {
-        user: {
-          id: row.id,
-          username: row.username,
-          email: row.email,
-          displayName: row.displayName,
-          avatarUrl: row.avatarUrl,
-          createdAt: row.createdAt.toISOString(),
-        },
-        totalPoints: rawScore,
-        displayPoints,
-        rank: rank.name,
-        rankEmoji: rank.emoji,
-        todayPoints,
-        streak,
-        firstEntryTime: row.firstEntryTime ? new Date(row.firstEntryTime).getTime() : null,
-      };
-    })
+  // Calculate streaks concurrently in parallel for all users
+  const streakResults = await Promise.all(
+    results.map((row) => calculateStreak(row.id, db))
   );
+
+  const entries = results.map((row, idx) => {
+    const rawScore = Number(row.rawScore);
+    const todayPoints = Number(row.todayScore);
+    const rank = getRank(rawScore);
+    const streak = streakResults[idx];
+
+    return {
+      user: {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
+        createdAt: row.createdAt.toISOString(),
+      },
+      totalPoints: rawScore,
+      displayPoints: rawScore,
+      rank: rank.name,
+      rankEmoji: rank.emoji,
+      todayPoints,
+      streak,
+      firstEntryTime: row.firstEntryTime ? new Date(row.firstEntryTime).getTime() : null,
+    };
+  });
 
   // Sort by:
   // 1. displayPoints (descending)
@@ -128,7 +123,7 @@ router.get('/', async (req, res) => {
     return regA - regB;
   });
 
-  res.json({ success: true, data: entries });
+  res.json({ success: true, data: entries, season: getCurrentSeason() });
 });
 
 export default router;

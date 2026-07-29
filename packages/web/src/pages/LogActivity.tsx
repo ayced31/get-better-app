@@ -6,9 +6,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ActivityCard } from '../components/features/ActivityCard';
 import { Skeleton } from '../components/ui/Skeleton';
-import { CATEGORIES, getISTDate } from '@get-better/shared';
+import { CATEGORIES, getISTDate, formatPointsSigned } from '@get-better/shared';
+import { useRetentionStatus, useClaimMilestone, useLogSlip } from '../hooks/useRetention';
 
-type CategoryKey = 'physical' | 'diet' | 'sleep' | 'study' | 'masturbation' | 'daily_log';
+type CategoryKey = 'physical' | 'diet' | 'sleep' | 'study' | 'lifestyle' | 'retention';
 
 export function LogActivity() {
   const today = getISTDate();
@@ -19,6 +20,10 @@ export function LogActivity() {
   const [searchParams] = useSearchParams();
   const initialCategory = (searchParams.get('category') as CategoryKey) || 'physical';
   const [activeTab, setActiveTab] = useState<CategoryKey>(initialCategory);
+
+  const { data: retentionStatus, isLoading: isRetentionLoading } = useRetentionStatus();
+  const claimMilestone = useClaimMilestone();
+  const logSlip = useLogSlip();
 
   const { showAlert, showConfirm } = useAlertStore();
 
@@ -40,6 +45,9 @@ export function LogActivity() {
         category: categoryKey,
         activity: activityKey,
       }).then((res) => {
+        if (res.streakBonus) {
+          showAlert(`Bonus! You earned +${res.streakBonus.bonus} points for an awesome streak!`, 'Success');
+        }
         if (res.warning) {
           showAlert(res.warning, 'Warning');
         }
@@ -49,6 +57,7 @@ export function LogActivity() {
     }
   };
 
+  // Only block the initial page render on main logs loading, NOT on retention loading
   if (isLoading) {
     return (
       <div className="container p-md flex flex-col gap-lg">
@@ -104,11 +113,15 @@ export function LogActivity() {
               [Warning] Daily cap reached! Additional positive points won't count, but you can still record activities and penalties.
             </p>
           )}
-          {capStatus.hasStudied8hr && (
+          {capStatus.hasStudied8hr ? (
             <p className="text-caption text-success">
-              [Bonus] Study 8 hours completed! Daily positive point cap bumped from 5 to 6 points.
+              [Bonus] Study 8 hours completed! Daily positive point cap bumped to 8 points.
             </p>
-          )}
+          ) : capStatus.hasStudied6hr ? (
+            <p className="text-caption text-success">
+              [Bonus] Study 6 hours completed! Daily positive point cap bumped to 7 points.
+            </p>
+          ) : null}
         </Card>
       )}
 
@@ -208,129 +221,98 @@ export function LogActivity() {
           </div>
         )}
 
-        {/* Masturbation Category (Escalating Penalties) */}
-        {activeCategory.type === 'masturbation' && (
-          <Card className="p-lg flex flex-col gap-md">
-            <div>
-              <h3 className="text-body" style={{ fontWeight: 600 }}>Masturbation Log</h3>
-              <p className="text-caption text-tertiary" style={{ marginTop: 'var(--space-xxs)' }}>
-                This resets monthly. Penalty escalates per occurrence: -3, -5, -7, -9.
-                If done more than 5 times in a month, all points become 0.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-sm" style={{ maxWidth: '400px' }}>
-              <div className="flex justify-between items-center text-body-sm p-sm" style={{ borderBottom: '1px solid var(--color-hairline)' }}>
-                <span>Times logged this month:</span>
-                <strong className="text-danger">
-                  {logs.filter((l) => l.category === 'masturbation').length}
-                </strong>
+        {/* Retention Category */}
+        {activeCategory.type === 'retention' && (
+          isRetentionLoading ? (
+            <Skeleton height="200px" />
+          ) : retentionStatus ? (
+            <Card className="p-lg flex flex-col gap-md" style={{ maxWidth: '500px' }}>
+              <div>
+                <h3 className="text-body" style={{ fontWeight: 600 }}>Semen Retention</h3>
+                <p className="text-caption text-tertiary" style={{ marginTop: 'var(--space-xxs)' }}>
+                  Achieve retention milestones to earn positive points added directly to your total. Logging a slip resets your target to Stage 1 (0 penalty).
+                </p>
               </div>
 
-              <div className="flex justify-center p-sm">
+              {/* Target Stage Card */}
+              <div
+                className="flex justify-between items-center p-md"
+                style={{
+                  backgroundColor: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-hairline-strong)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <div className="flex flex-col gap-xxs">
+                  <span className="text-caption text-tertiary uppercase">Active Target Stage</span>
+                  <span className="text-body" style={{ fontWeight: 600 }}>
+                    {retentionStatus.currentStageDays} Days Goal
+                  </span>
+                </div>
+                <span className="text-display-md text-success" style={{ fontWeight: 700 }}>
+                  +{retentionStatus.currentStagePoints} pts
+                </span>
+              </div>
+
+              <div className="flex gap-sm">
                 <Button
-                  variant="danger"
+                  variant="primary"
                   fullWidth
-                  loading={createLog.isPending}
+                  loading={claimMilestone.isPending}
                   onClick={() => {
-                    if (confirm('Are you logging a masturbation slip? Points will be deducted based on monthly count.')) {
-                      handleToggleLog('masturbation', 'slip', false);
-                    }
+                    claimMilestone.mutate(undefined, {
+                      onSuccess: () => {
+                        showAlert(`Congratulations! You logged ${retentionStatus.currentStageDays} Days Retention (+${retentionStatus.currentStagePoints} pts)!`, 'Success');
+                      },
+                    });
                   }}
                 >
-                  Log Slip
+                  Log {retentionStatus.currentStageDays} Days Achieved
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  loading={logSlip.isPending}
+                  onClick={() => {
+                    showConfirm('Are you logging a masturbation slip? This will reset your active target stage back to 7 Days (0 penalty).', {
+                      title: 'Masturbation Slip',
+                      confirmLabel: 'Reset Stage to 7 Days',
+                      onConfirm: () => logSlip.mutate(),
+                    });
+                  }}
+                >
+                  Masturbation Slip
                 </Button>
               </div>
 
-              {logs.filter((l) => l.category === 'masturbation').map((log, index) => (
-                <div
-                  key={log.id}
-                  className="flex justify-between items-center p-xs"
-                  style={{
-                    backgroundColor: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-hairline)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <span className="text-body-sm">Slip #{index + 1}</span>
-                  <div className="flex items-center gap-sm">
-                    <span className="text-danger" style={{ fontWeight: 600 }}>
-                      {log.points === 0 ? 'TOTAL SCORE RESET' : `${log.points}`}
-                    </span>
-                    <button
-                      onClick={() => handleToggleLog('masturbation', 'slip', true, log.id)}
-                      className="interactive text-danger"
-                      style={{ background: 'none', border: 'none', fontSize: 'var(--text-xs)' }}
-                      title="Delete log"
+              {retentionStatus.claimedMilestones && retentionStatus.claimedMilestones.length > 0 && (
+                <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
+                  <span className="text-caption text-tertiary mb-xs">Achieved Milestones History</span>
+                  {retentionStatus.claimedMilestones.map((entry, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center p-xs"
+                      style={{
+                        backgroundColor: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-hairline)',
+                        borderRadius: 'var(--radius-md)',
+                      }}
                     >
-                      Delete
-                    </button>
-                  </div>
+                      <span className="text-body-sm">{entry.days} Days Milestone</span>
+                      <span className="text-success" style={{ fontWeight: 600 }}>
+                        {formatPointsSigned(entry.points)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {/* Daily Log Category */}
-        {activeCategory.type === 'daily_log' && (
-          <Card className="p-lg flex flex-col gap-md">
-            <div>
-              <h3 className="text-body" style={{ fontWeight: 600 }}>Daily Log Streak & Penalties</h3>
-              <p className="text-caption text-tertiary" style={{ marginTop: 'var(--space-xxs)' }}>
-                Logging daily triggers streak bonuses: +1, +2, +3, +4 points at 7, 14, 21, 28 days respectively.
-                Missing a log results in -1 points, compounding by -1 each consecutive missed day.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-sm" style={{ maxWidth: '400px' }}>
-              <div className="flex justify-between items-center text-body-sm p-sm" style={{ borderBottom: '1px solid var(--color-hairline)' }}>
-                <span>Daily Log Penalty Status:</span>
-                <span>Active</span>
-              </div>
-              <div className="flex justify-center p-sm">
-                <Button
-                  variant="danger"
-                  fullWidth
-                  loading={createLog.isPending}
-                  onClick={() => {
-                    if (confirm('Are you logging a missed log day penalty?')) {
-                      handleToggleLog('daily_log', 'miss', false);
-                    }
-                  }}
-                >
-                  Log Missed Log Day
-                </Button>
-              </div>
-
-              {logs.filter((l) => l.category === 'daily_log').map((log) => (
-                <div
-                  key={log.id}
-                  className="flex justify-between items-center p-xs"
-                  style={{
-                    backgroundColor: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-hairline)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <span className="text-body-sm">Missed Day Log</span>
-                  <div className="flex items-center gap-sm">
-                    <span className="text-danger" style={{ fontWeight: 600 }}>
-                      {log.points}
-                    </span>
-                    <button
-                      onClick={() => handleToggleLog('daily_log', 'miss', true, log.id)}
-                      className="interactive text-danger"
-                      style={{ background: 'none', border: 'none', fontSize: 'var(--text-xs)' }}
-                      title="Delete log"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+              )}
+            </Card>
+          ) : (
+            <Card className="p-md text-center text-muted">
+              Failed to load retention status. Please try again.
+            </Card>
+          )
         )}
       </div>
     </div>

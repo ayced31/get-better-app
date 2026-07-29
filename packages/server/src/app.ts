@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import logRoutes from './routes/logs.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import userRoutes from './routes/users.js';
+import retentionRoutes from './routes/retention.js';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/retention', retentionRoutes);
 
 // ─── Health Check ────────────────────────────────────────────────
 

@@ -2,28 +2,48 @@ import { db } from '../db/index.js';
 import { users, activityLogs } from '../db/schema.js';
 import { getISTDate, addDay, getDateRange, subtractDay } from '@get-better/shared';
 import { calculatePoints, recalculateDailyPoints } from './points.js';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, lte, gte } from 'drizzle-orm';
 
-async function checkHasWorkout(userId: string, dateStr: string, dbClient: any): Promise<boolean> {
-  const logs = await dbClient
-    .select()
-    .from(activityLogs)
-    .where(
-      and(
-        eq(activityLogs.userId, userId),
-        eq(activityLogs.logDate, dateStr),
-        eq(activityLogs.category, 'physical')
-      )
-    );
-  return logs.some((l: any) => l.activity !== 'workout_gap');
+// In-memory cache to prevent re-running backfill on every single request
+const userLastBackfill = new Map<string, number>();
+const BACKFILL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
+
+let lastAllUsersBackfill = 0;
+const ALL_USERS_BACKFILL_TTL_MS = 10 * 60 * 1000; // 10 minutes cache for global backfill
+
+function checkHasWorkoutInMemory(logsByDate: Map<string, any[]>, dateStr: string): boolean {
+  const dayLogs = logsByDate.get(dateStr) || [];
+  return dayLogs.some((l: any) => l.category === 'physical' && l.activity !== 'workout_gap');
+}
+
+function getConsecutiveMissedDaysInMemory(logsByDate: Map<string, any[]>, dateStr: string): number {
+  let count = 0;
+  let checkDate = subtractDay(dateStr);
+  for (let i = 0; i < 30; i++) {
+    const dayLogs = logsByDate.get(checkDate) || [];
+    const hasMiss = dayLogs.some((l: any) => l.category === 'daily_log' && l.activity === 'miss');
+    if (hasMiss) {
+      count++;
+      checkDate = subtractDay(checkDate);
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 /**
  * Checks all dates from user registration to today.
- * If a date is in the past, past its 4:00 AM IST next-day threshold,
- * and has 0 activity logs, automatically logs a missed log day penalty.
+ * Single batch query fetches all user logs into memory to eliminate N+1 database queries.
  */
-export async function backfillMissedDaysForUser(userId: string, dbClient: any = db) {
+export async function backfillMissedDaysForUser(userId: string, dbClient: any = db, force: boolean = false) {
+  const now = Date.now();
+  const lastRun = userLastBackfill.get(userId) || 0;
+  if (!force && now - lastRun < BACKFILL_CACHE_TTL_MS) {
+    return; // Skip — backfilled recently
+  }
+  userLastBackfill.set(userId, now);
+
   // 1. Fetch user to get registration date
   const [user] = await dbClient
     .select({ createdAt: users.createdAt })
@@ -36,16 +56,26 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
   const today = getISTDate();
   const allDates = getDateRange(regDate, today);
 
+  // 2. Fetch ALL activity logs for this user in a SINGLE database query
+  const allUserLogs = await dbClient
+    .select()
+    .from(activityLogs)
+    .where(eq(activityLogs.userId, userId));
+
+  // 3. Group logs by date in memory
+  const logsByDate = new Map<string, any[]>();
+  for (const log of allUserLogs) {
+    const list = logsByDate.get(log.logDate) || [];
+    list.push(log);
+    logsByDate.set(log.logDate, list);
+  }
+
   for (const dateStr of allDates) {
     if (dateStr === today) {
       continue; // Today's tracking window is still open
     }
 
-    // A. Fetch existing logs for this date first to run auto-penalties (which start at 12:00 AM, i.e. when dateStr < today)
-    const dayLogs = await dbClient
-      .select()
-      .from(activityLogs)
-      .where(and(eq(activityLogs.userId, userId), eq(activityLogs.logDate, dateStr)));
+    const dayLogs = logsByDate.get(dateStr) || [];
 
     // 1. Check No Study penalty: user logged other activities but no study log
     const userLoggedActivities = dayLogs.filter(
@@ -62,15 +92,17 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
       if (!noStudyPenalty) {
         try {
           const result = await calculatePoints(userId, 'study', 'no_study', dateStr, dbClient);
-          await dbClient.insert(activityLogs).values({
+          const [inserted] = await dbClient.insert(activityLogs).values({
             userId,
             logDate: dateStr,
             category: 'study',
             activity: 'no_study',
             points: result.points,
-            rulesVersion: 'v1',
+            rulesVersion: 'v2',
             metadata: { automatic: true },
-          });
+          }).returning();
+          dayLogs.push(inserted);
+          logsByDate.set(dateStr, dayLogs);
           await recalculateDailyPoints(userId, dateStr, dbClient);
         } catch (err) {
           console.error(`Failed to auto-insert no_study penalty for user ${userId} on ${dateStr}:`, err);
@@ -82,6 +114,8 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
           await dbClient
             .delete(activityLogs)
             .where(eq(activityLogs.id, noStudyPenalty.id));
+          const updated = dayLogs.filter((l: any) => l.id !== noStudyPenalty.id);
+          logsByDate.set(dateStr, updated);
           await recalculateDailyPoints(userId, dateStr, dbClient);
         } catch (err) {
           console.error(`Failed to remove no_study penalty for user ${userId} on ${dateStr}:`, err);
@@ -98,22 +132,24 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
       const dayMinus2 = subtractDay(dayMinus1);
 
       if (dayMinus2 >= regDate) {
-        const hasWorkoutDay1 = await checkHasWorkout(userId, dayMinus1, dbClient);
-        const hasWorkoutDay2 = await checkHasWorkout(userId, dayMinus2, dbClient);
+        const hasWorkoutDay1 = checkHasWorkoutInMemory(logsByDate, dayMinus1);
+        const hasWorkoutDay2 = checkHasWorkoutInMemory(logsByDate, dayMinus2);
 
         if (!hasWorkoutDay1 && !hasWorkoutDay2) {
           if (!workoutGapPenalty) {
             try {
               const result = await calculatePoints(userId, 'physical', 'workout_gap', dateStr, dbClient);
-              await dbClient.insert(activityLogs).values({
+              const [inserted] = await dbClient.insert(activityLogs).values({
                 userId,
                 logDate: dateStr,
                 category: 'physical',
                 activity: 'workout_gap',
                 points: result.points,
-                rulesVersion: 'v1',
+                rulesVersion: 'v2',
                 metadata: { automatic: true },
-              });
+              }).returning();
+              dayLogs.push(inserted);
+              logsByDate.set(dateStr, dayLogs);
               await recalculateDailyPoints(userId, dateStr, dbClient);
             } catch (err) {
               console.error(`Failed to auto-insert workout_gap penalty for user ${userId} on ${dateStr}:`, err);
@@ -125,6 +161,8 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
               await dbClient
                 .delete(activityLogs)
                 .where(eq(activityLogs.id, workoutGapPenalty.id));
+              const updated = dayLogs.filter((l: any) => l.id !== workoutGapPenalty.id);
+              logsByDate.set(dateStr, updated);
               await recalculateDailyPoints(userId, dateStr, dbClient);
             } catch (err) {
               console.error(`Failed to remove workout_gap penalty for user ${userId} on ${dateStr}:`, err);
@@ -138,6 +176,8 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
           await dbClient
             .delete(activityLogs)
             .where(eq(activityLogs.id, workoutGapPenalty.id));
+          const updated = dayLogs.filter((l: any) => l.id !== workoutGapPenalty.id);
+          logsByDate.set(dateStr, updated);
           await recalculateDailyPoints(userId, dateStr, dbClient);
         } catch (err) {
           console.error(`Failed to remove workout_gap penalty for user ${userId} on ${dateStr}:`, err);
@@ -145,7 +185,7 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
       }
     }
 
-    // B. Check Cutoff-based Daily Log Miss Penalty (only runs after 4:00 AM threshold)
+    // 3. Check Cutoff-based Daily Log Miss Penalty (only runs after 4:00 AM threshold)
     const nextDayStr = addDay(dateStr);
     const cutoffTime = new Date(`${nextDayStr}T04:00:00+05:30`);
 
@@ -153,34 +193,37 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
       continue; // Not yet past 4:00 AM of the next calendar day
     }
 
-    // Refresh existing logs (in case no_study or workout_gap was added, which makes length > 0)
-    // Wait, the daily log miss penalty ONLY applies if the user logged ABSOLUTELY NOTHING of their own choice.
-    // So we check if userLoggedActivities is 0!
     if (userLoggedActivities.length === 0) {
-      // Check if a miss penalty is already logged
       const hasMissPenalty = dayLogs.some((l: any) => l.category === 'daily_log' && l.activity === 'miss');
       if (!hasMissPenalty) {
         try {
-          const result = await calculatePoints(userId, 'daily_log', 'miss', dateStr, dbClient);
-          await dbClient.insert(activityLogs).values({
+          const MISS_BASE_POINTS = -1;
+          const MISS_COMPOUNDING = -1;
+          const consecutiveMisses = getConsecutiveMissedDaysInMemory(logsByDate, dateStr);
+          const points = MISS_BASE_POINTS + (consecutiveMisses * MISS_COMPOUNDING);
+
+          const [inserted] = await dbClient.insert(activityLogs).values({
             userId,
             logDate: dateStr,
             category: 'daily_log',
             activity: 'miss',
-            points: result.points,
-            rulesVersion: 'v1',
+            points: points,
+            rulesVersion: 'v2',
             metadata: { automatic: true },
-          });
+          }).returning();
+          dayLogs.push(inserted);
+          logsByDate.set(dateStr, dayLogs);
         } catch (err) {
           console.error(`Failed to auto-insert miss penalty for user ${userId} on ${dateStr}:`, err);
         }
       }
     } else {
-      // If there are user logged activities but a miss penalty exists, delete it
       const missPenalty = dayLogs.find((l: any) => l.category === 'daily_log' && l.activity === 'miss');
       if (missPenalty) {
         try {
           await dbClient.delete(activityLogs).where(eq(activityLogs.id, missPenalty.id));
+          const updated = dayLogs.filter((l: any) => l.id !== missPenalty.id);
+          logsByDate.set(dateStr, updated);
         } catch (err) {
           console.error(`Failed to remove miss penalty for user ${userId} on ${dateStr}:`, err);
         }
@@ -190,14 +233,18 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
 }
 
 /**
- * Backfills all users in the system. Used before leaderboard generation.
+ * Backfills all users in the system (throttled).
  */
 export async function backfillAllUsers(dbClient: any = db) {
+  const now = Date.now();
+  if (now - lastAllUsersBackfill < ALL_USERS_BACKFILL_TTL_MS) {
+    return; // Skip global backfill if completed recently
+  }
+  lastAllUsersBackfill = now;
+
   try {
     const allUsers = await dbClient.select({ id: users.id }).from(users);
-    for (const u of allUsers) {
-      await backfillMissedDaysForUser(u.id, dbClient);
-    }
+    await Promise.all(allUsers.map((u: any) => backfillMissedDaysForUser(u.id, dbClient, true)));
   } catch (err) {
     console.error('Failed to run batch backfill for all users:', err);
   }

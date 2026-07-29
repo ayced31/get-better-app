@@ -3,6 +3,7 @@ import { activityLogs } from '../db/schema.js';
 import {
   CATEGORIES,
   DAILY_POSITIVE_CAP,
+  DAILY_POSITIVE_CAP_WITH_6HR_STUDY,
   DAILY_POSITIVE_CAP_WITH_8HR_STUDY,
   getISTDate,
   subtractDay,
@@ -11,7 +12,7 @@ import {
 import type { DailyCapStatus } from '@get-better/shared';
 import type { Database } from '../db/index.js';
 
-const CURRENT_RULES_VERSION = '1.0.0';
+const CURRENT_RULES_VERSION = 'v2';
 
 // ─── Points Calculation ──────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export async function calculatePoints(
   logDate: string,
   db: Database
 ): Promise<PointsResult> {
-  const categoryDef = CATEGORIES[category];
+  const categoryDef = CATEGORIES[category as keyof typeof CATEGORIES];
   if (!categoryDef) {
     return { points: 0, blocked: true, reason: `Unknown category: ${category}` };
   }
@@ -61,9 +62,9 @@ export async function calculatePoints(
   // 3. Determine base points
   let points = 0;
 
-  if (categoryDef.type === 'standard') {
-    const activityDef = categoryDef.activities[activity];
-    const penaltyDef = categoryDef.penalties?.[activity];
+  if (categoryDef.type === 'standard' || categoryDef.type === 'retention') {
+    const activityDef = (categoryDef as any).activities?.[activity];
+    const penaltyDef = (categoryDef as any).penalties?.[activity];
 
     if (activityDef) {
       points = activityDef.points;
@@ -78,49 +79,19 @@ export async function calculatePoints(
     } else {
       return { points: 0, blocked: true, reason: `Unknown activity: ${activity}` };
     }
-  } else if (categoryDef.type === 'masturbation') {
-    // Count occurrences this month
-    const monthStart = getMonthStart(logDate);
-    const monthlyCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(activityLogs)
-      .where(
-        and(
-          eq(activityLogs.userId, userId),
-          eq(activityLogs.category, 'masturbation'),
-          sql`${activityLogs.logDate} >= ${monthStart}`,
-          sql`${activityLogs.logDate} <= ${logDate}`
-        )
-      );
-
-    const occurrenceNumber = Number(monthlyCount[0]?.count ?? 0) + 1; // +1 for this new entry
-
-    if (occurrenceNumber >= 5) {
-      // More than 5 times → effect is 'reset_all_points' — we return a special flag
-      points = 0; // The route handler will set total to 0
-      return { points: -99999, blocked: false, reason: 'reset_all_points' };
-    }
-
-    const penaltyEntry = categoryDef.penalties.find(
-      (p) => p.occurrence === occurrenceNumber
-    );
-    points = penaltyEntry?.points ?? -9;
-  } else if (categoryDef.type === 'daily_log') {
-    const penaltyDef = categoryDef.penalties[activity];
-    if (penaltyDef) {
-      if ('compounding' in penaltyDef) {
-        const consecutiveDays = await getConsecutivePenaltyDays(userId, category, activity, logDate, db);
-        points = penaltyDef.basePoints + (penaltyDef.compounding * consecutiveDays);
-      } else {
-        points = (penaltyDef as { points: number }).points;
-      }
-    }
   }
 
   // 4. Enforce global daily cap for POSITIVE points
   if (points > 0) {
     const hasStudied8hr = activity === 'study_8hr' || todaysLogs.some((l) => l.activity === 'study_8hr');
-    const dailyCap = hasStudied8hr ? DAILY_POSITIVE_CAP_WITH_8HR_STUDY : DAILY_POSITIVE_CAP;
+    const hasStudied6hr = activity === 'study_6hr' || todaysLogs.some((l) => l.activity === 'study_6hr');
+    
+    let dailyCap = DAILY_POSITIVE_CAP;
+    if (hasStudied8hr) {
+      dailyCap = DAILY_POSITIVE_CAP_WITH_8HR_STUDY;
+    } else if (hasStudied6hr) {
+      dailyCap = DAILY_POSITIVE_CAP_WITH_6HR_STUDY;
+    }
 
     const todaysPositiveTotal = todaysLogs
       .filter((l) => l.points > 0)
@@ -156,7 +127,14 @@ export async function getDailyCapStatus(
     );
 
   const hasStudied8hr = todaysLogs.some((l) => l.activity === 'study_8hr');
-  const globalCap = hasStudied8hr ? DAILY_POSITIVE_CAP_WITH_8HR_STUDY : DAILY_POSITIVE_CAP;
+  const hasStudied6hr = todaysLogs.some((l) => l.activity === 'study_6hr');
+  
+  let globalCap = DAILY_POSITIVE_CAP;
+  if (hasStudied8hr) {
+    globalCap = DAILY_POSITIVE_CAP_WITH_8HR_STUDY;
+  } else if (hasStudied6hr) {
+    globalCap = DAILY_POSITIVE_CAP_WITH_6HR_STUDY;
+  }
 
   const globalPositiveUsed = todaysLogs
     .filter((l) => l.points > 0)
@@ -176,6 +154,7 @@ export async function getDailyCapStatus(
     globalPositiveCap: globalCap,
     categoryCaps,
     hasStudied8hr,
+    hasStudied6hr,
   };
 }
 
@@ -236,9 +215,16 @@ export async function recalculateDailyPoints(
 
   if (logs.length === 0) return;
 
-  // 2. Check if 8hr study is logged today to determine the positive cap
+  // 2. Check if 8hr or 6hr study is logged today to determine the positive cap
   const hasStudied8hr = logs.some((l) => l.activity === 'study_8hr');
-  const dailyCap = hasStudied8hr ? DAILY_POSITIVE_CAP_WITH_8HR_STUDY : DAILY_POSITIVE_CAP;
+  const hasStudied6hr = logs.some((l) => l.activity === 'study_6hr');
+  
+  let dailyCap = DAILY_POSITIVE_CAP;
+  if (hasStudied8hr) {
+    dailyCap = DAILY_POSITIVE_CAP_WITH_8HR_STUDY;
+  } else if (hasStudied6hr) {
+    dailyCap = DAILY_POSITIVE_CAP_WITH_6HR_STUDY;
+  }
 
   let currentPositiveTotal = 0;
   const categoryCounts: Record<string, number> = {};
@@ -250,9 +236,9 @@ export async function recalculateDailyPoints(
     // A. Calculate base points (before daily cap constraints)
     let basePoints = 0;
 
-    if (categoryDef.type === 'standard') {
-      const activityDef = categoryDef.activities[log.activity as keyof typeof categoryDef.activities];
-      const penaltyDef = categoryDef.penalties?.[log.activity];
+    if (categoryDef.type === 'standard' || categoryDef.type === 'retention') {
+      const activityDef = (categoryDef as any).activities?.[log.activity];
+      const penaltyDef = (categoryDef as any).penalties?.[log.activity];
 
       if (activityDef) {
         basePoints = activityDef.points;
@@ -262,46 +248,6 @@ export async function recalculateDailyPoints(
           basePoints = penaltyDef.basePoints + (penaltyDef.compounding * consecutiveDays);
         } else {
           basePoints = penaltyDef.points;
-        }
-      }
-    } else if (categoryDef.type === 'masturbation') {
-      // For masturbation, get the occurrence number up to this log
-      const prevMasturbationLogs = logs.filter(
-        (l) => l.category === 'masturbation' && l.createdAt <= log.createdAt
-      );
-      const monthStart = getMonthStart(logDate);
-      const prevDaysCountResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(activityLogs)
-        .where(
-          and(
-            eq(activityLogs.userId, userId),
-            eq(activityLogs.category, 'masturbation'),
-            sql`${activityLogs.logDate} >= ${monthStart}`,
-            sql`${activityLogs.logDate} < ${logDate}`
-          )
-        );
-      
-      const prevDaysCount = Number(prevDaysCountResult[0]?.count ?? 0);
-      const positionInToday = prevMasturbationLogs.findIndex((l) => l.id === log.id) + 1;
-      const occurrenceNumber = prevDaysCount + positionInToday;
-
-      if (occurrenceNumber >= 5) {
-        basePoints = 0;
-      } else {
-        const penaltyEntry = categoryDef.penalties.find(
-          (p) => p.occurrence === occurrenceNumber
-        );
-        basePoints = penaltyEntry?.points ?? -9;
-      }
-    } else if (categoryDef.type === 'daily_log') {
-      const penaltyDef = categoryDef.penalties[log.activity];
-      if (penaltyDef) {
-        if ('compounding' in penaltyDef) {
-          const consecutiveDays = await getConsecutivePenaltyDays(userId, log.category, log.activity, logDate, db);
-          basePoints = penaltyDef.basePoints + (penaltyDef.compounding * consecutiveDays);
-        } else {
-          basePoints = (penaltyDef as { points: number }).points;
         }
       }
     }

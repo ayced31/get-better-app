@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, date, jsonb, boolean, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, date, jsonb, boolean, timestamp, index, real } from 'drizzle-orm/pg-core';
 
 // ─── Users ───────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ export const activityLogs = pgTable(
     logDate: date('log_date').notNull(),
     category: varchar('category', { length: 50 }).notNull(),
     activity: varchar('activity', { length: 100 }).notNull(),
-    points: integer('points').notNull(),
+    points: real('points').notNull(),
     rulesVersion: varchar('rules_version', { length: 20 }).notNull(),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -45,4 +45,17 @@ export const rulesVersions = pgTable('rules_versions', {
   rulesSnapshot: jsonb('rules_snapshot').notNull(),
   isActive: boolean('is_active').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Retention Status ──────────────────────────────────────────────
+
+export const retentionStatus = pgTable('retention_status', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+    .unique(),
+  currentStreakStart: date('current_streak_start').notNull(),
+  lastClaimedDays: integer('last_claimed_days').default(0).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
