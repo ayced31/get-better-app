@@ -48,3 +48,30 @@ export function useLogSlip() {
     },
   });
 }
+
+export function useDeleteRetentionSlip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slipId: string) => api.delete<RetentionStatus>(`/retention/slip/${slipId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['retention'] });
+      queryClient.invalidateQueries({ queryKey: ['userStats'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
+}
+
+export function useUpdateRetentionSlip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slipId, logDate }: { slipId: string; logDate: string }) =>
+      api.put<RetentionStatus>(`/retention/slip/${slipId}`, { logDate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['retention'] });
+      queryClient.invalidateQueries({ queryKey: ['userStats'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
+}

@@ -33,6 +33,12 @@ export type LeaderboardEntry = {
   previousSeasonRank?: string | null;
 };
 
+export type RetentionSlip = {
+  id: string;
+  logDate: string;
+  createdAt: string;
+};
+
 export type RetentionStreakSession = {
   id: string;
   startDate: string;
@@ -41,6 +47,7 @@ export type RetentionStreakSession = {
   totalPoints: number;
   milestonesCount: number;
   isCurrent?: boolean;
+  slipLogId?: string;
 };
 
 export type RetentionStatus = {
@@ -48,7 +55,9 @@ export type RetentionStatus = {
   daysElapsed: number;
   nextMilestoneDays: number;
   nextMilestonePoints: number;
+  hasStarted: boolean;
   claimedMilestones: { days: number; points: number; claimedAt: string }[];
+  slips: RetentionSlip[];
   streakSessions: RetentionStreakSession[];
   newlyAwardedMilestones?: { days: number; points: number }[];
 };

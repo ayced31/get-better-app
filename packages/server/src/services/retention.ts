@@ -99,7 +99,7 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
   const nextMilestoneDays = Math.max(7, (Math.floor(maxClaimed / 7) + 1) * 7);
   const nextMilestonePoints = (nextMilestoneDays / 7) * 2;
 
-  // 4. Build Streak Sessions History (Option 2)
+  // 4. Build Slips list & Streak Sessions History
   const allLogsAsc = await db
     .select({
       id: activityLogs.id,
@@ -116,6 +116,17 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
       )
     )
     .orderBy(activityLogs.createdAt);
+
+  const hasStarted = allLogsAsc.length > 0 || status.lastClaimedDays > 0;
+  const actualDaysElapsed = hasStarted ? daysElapsed : 0;
+
+  const slips = allLogsAsc
+    .filter((l) => l.activity === 'slip')
+    .map((l) => ({
+      id: l.id,
+      logDate: l.logDate,
+      createdAt: l.createdAt.toISOString(),
+    }));
 
   const streakSessions: any[] = [];
   let currentGroup: typeof allLogsAsc = [];
@@ -137,6 +148,7 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
         totalPoints,
         milestonesCount: milestoneLogs.length,
         isCurrent: false,
+        slipLogId: log.id,
       });
       currentGroup = [];
     } else if (log.activity.startsWith('milestone_')) {
@@ -144,23 +156,27 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
     }
   }
 
-  // Add active current streak session at top
-  streakSessions.unshift({
-    id: 'current-session',
-    startDate: status.currentStreakStart,
-    endDate: null,
-    maxDays: daysElapsed,
-    totalPoints: validMilestoneLogs.reduce((sum, l) => sum + l.points, 0),
-    milestonesCount: validMilestoneLogs.length,
-    isCurrent: true,
-  });
+  // Add active current streak session at top if streak has started
+  if (hasStarted) {
+    streakSessions.unshift({
+      id: 'current-session',
+      startDate: status.currentStreakStart,
+      endDate: null,
+      maxDays: actualDaysElapsed,
+      totalPoints: validMilestoneLogs.reduce((sum, l) => sum + l.points, 0),
+      milestonesCount: validMilestoneLogs.length,
+      isCurrent: true,
+    });
+  }
 
   return {
-    currentStreakStart: status.currentStreakStart,
-    daysElapsed,
+    currentStreakStart: hasStarted ? status.currentStreakStart : null,
+    daysElapsed: actualDaysElapsed,
     nextMilestoneDays,
     nextMilestonePoints,
+    hasStarted,
     claimedMilestones,
+    slips,
     streakSessions,
     ...(newlyAwardedMilestones.length > 0 ? { newlyAwardedMilestones } : {}),
   };
@@ -169,6 +185,16 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
 export async function startRetentionStreak(userId: string, startDate: string | undefined, db: Database) {
   const today = getISTDate();
   const start = startDate || today;
+
+  // Insert streak_start activity log to record explicit user start action
+  await db.insert(activityLogs).values({
+    userId,
+    logDate: start,
+    category: 'retention',
+    activity: 'streak_start',
+    points: 0,
+    rulesVersion: RULES_VERSION,
+  });
 
   await db.insert(retentionStatus)
     .values({
@@ -214,5 +240,75 @@ export async function logSlip(userId: string, db: Database) {
     })
     .where(eq(retentionStatus.userId, userId));
     
+  return await getRetentionStatus(userId, db);
+}
+
+export async function deleteRetentionSlip(userId: string, slipId: string, db: Database) {
+  // Delete the slip log entry
+  await db.delete(activityLogs).where(
+    and(
+      eq(activityLogs.id, slipId),
+      eq(activityLogs.userId, userId),
+      eq(activityLogs.category, 'retention')
+    )
+  );
+
+  // Find remaining retention logs to restore start date
+  const remainingLogs = await db
+    .select({ activity: activityLogs.activity, logDate: activityLogs.logDate, createdAt: activityLogs.createdAt })
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.category, 'retention')
+      )
+    )
+    .orderBy(desc(activityLogs.createdAt));
+
+  const lastSlip = remainingLogs.find((l) => l.activity === 'slip');
+  const streakStartLog = remainingLogs.find((l) => l.activity === 'streak_start');
+
+  const newStart = lastSlip
+    ? lastSlip.logDate
+    : streakStartLog
+    ? streakStartLog.logDate
+    : getISTDate();
+
+  await db.update(retentionStatus)
+    .set({ currentStreakStart: newStart, updatedAt: new Date() })
+    .where(eq(retentionStatus.userId, userId));
+
+  return await getRetentionStatus(userId, db);
+}
+
+export async function updateRetentionSlip(userId: string, slipId: string, newDate: string, db: Database) {
+  await db.update(activityLogs)
+    .set({ logDate: newDate, updatedAt: new Date() })
+    .where(
+      and(
+        eq(activityLogs.id, slipId),
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.category, 'retention')
+      )
+    );
+
+  const remainingLogs = await db
+    .select({ activity: activityLogs.activity, logDate: activityLogs.logDate, createdAt: activityLogs.createdAt })
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.category, 'retention')
+      )
+    )
+    .orderBy(desc(activityLogs.createdAt));
+
+  const lastSlip = remainingLogs.find((l) => l.activity === 'slip');
+  if (lastSlip) {
+    await db.update(retentionStatus)
+      .set({ currentStreakStart: lastSlip.logDate, updatedAt: new Date() })
+      .where(eq(retentionStatus.userId, userId));
+  }
+
   return await getRetentionStatus(userId, db);
 }
