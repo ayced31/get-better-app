@@ -6,6 +6,14 @@ import type { RetentionStatus } from '@get-better/shared';
 
 const RULES_VERSION = 'v2';
 
+function calculateDaysElapsed(startDateStr: string, endDateStr: string): number {
+  const start = new Date(startDateStr + 'T00:00:00Z');
+  const end = new Date(endDateStr + 'T00:00:00Z');
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
 export async function getRetentionStatus(userId: string, db: Database): Promise<RetentionStatus> {
   const today = getISTDate();
   
@@ -21,7 +29,9 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
     status = newStatus;
   }
 
-  // Get claimed milestones history
+  const daysElapsed = calculateDaysElapsed(status.currentStreakStart, today);
+
+  // 2. Get claimed milestones history
   const logs = await db
     .select({ activity: activityLogs.activity, points: activityLogs.points, createdAt: activityLogs.createdAt, logDate: activityLogs.logDate })
     .from(activityLogs)
@@ -34,72 +44,152 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
     .orderBy(desc(activityLogs.createdAt));
 
   const milestoneLogs = logs.filter((l) => l.activity.startsWith('milestone_'));
-  const claimedMilestones = milestoneLogs.map((l) => ({
-    days: parseInt(l.activity.replace('milestone_', '').replace('d', ''), 10) || 0,
-    points: l.points,
-    claimedAt: l.createdAt.toISOString(),
-  }));
 
-  // Sync lastClaimedDays based on valid logs since last slip or currentStreakStart
-  const lastSlip = logs.find(l => l.activity === 'slip');
+  // Sync valid logs since last slip or currentStreakStart
+  const lastSlip = logs.find((l) => l.activity === 'slip');
   let validMilestoneLogs = milestoneLogs;
   if (lastSlip) {
-    validMilestoneLogs = milestoneLogs.filter(l => l.createdAt > lastSlip.createdAt);
+    validMilestoneLogs = milestoneLogs.filter((l) => l.createdAt > lastSlip.createdAt);
   } else {
-    validMilestoneLogs = milestoneLogs.filter(l => l.logDate >= status.currentStreakStart);
+    validMilestoneLogs = milestoneLogs.filter((l) => l.logDate >= status.currentStreakStart);
   }
 
-  const derivedLastClaimedDays = validMilestoneLogs.length > 0 
-    ? Math.max(...validMilestoneLogs.map(l => parseInt(l.activity.replace('milestone_', '').replace('d', ''), 10) || 0))
-    : 0;
+  const claimedDaysSet = new Set(
+    validMilestoneLogs.map((l) => parseInt(l.activity.replace('milestone_', '').replace('d', ''), 10) || 0)
+  );
 
-  if (derivedLastClaimedDays !== status.lastClaimedDays) {
+  // 3. Auto-award reached milestones based on elapsed days
+  const newlyAwardedMilestones: { days: number; points: number }[] = [];
+
+  for (let m = 7; m <= daysElapsed; m += 7) {
+    if (!claimedDaysSet.has(m)) {
+      const points = (m / 7) * 2;
+      const activity = `milestone_${m}d`;
+
+      await db.insert(activityLogs).values({
+        userId,
+        logDate: today,
+        category: 'retention',
+        activity,
+        points,
+        rulesVersion: RULES_VERSION,
+      });
+
+      claimedDaysSet.add(m);
+      newlyAwardedMilestones.push({ days: m, points });
+    }
+  }
+
+  const claimedMilestones = Array.from(claimedDaysSet)
+    .sort((a, b) => b - a)
+    .map((days) => ({
+      days,
+      points: (days / 7) * 2,
+      claimedAt: new Date().toISOString(),
+    }));
+
+  const maxClaimed = claimedDaysSet.size > 0 ? Math.max(...Array.from(claimedDaysSet)) : 0;
+  
+  if (maxClaimed !== status.lastClaimedDays) {
     await db.update(retentionStatus)
-      .set({ lastClaimedDays: derivedLastClaimedDays, updatedAt: new Date() })
+      .set({ lastClaimedDays: maxClaimed, updatedAt: new Date() })
       .where(eq(retentionStatus.userId, userId));
-    status.lastClaimedDays = derivedLastClaimedDays;
   }
 
-  // Active stage days: starts at 7, or lastClaimedDays + 7
-  const currentStageDays = (status.lastClaimedDays || 0) + 7;
-  const currentStagePoints = (currentStageDays / 7) * 2;
+  const nextMilestoneDays = Math.max(7, (Math.floor(maxClaimed / 7) + 1) * 7);
+  const nextMilestonePoints = (nextMilestoneDays / 7) * 2;
+
+  // 4. Build Streak Sessions History (Option 2)
+  const allLogsAsc = await db
+    .select({
+      id: activityLogs.id,
+      activity: activityLogs.activity,
+      points: activityLogs.points,
+      logDate: activityLogs.logDate,
+      createdAt: activityLogs.createdAt,
+    })
+    .from(activityLogs)
+    .where(
+      and(
+        eq(activityLogs.userId, userId),
+        eq(activityLogs.category, 'retention')
+      )
+    )
+    .orderBy(activityLogs.createdAt);
+
+  const streakSessions: any[] = [];
+  let currentGroup: typeof allLogsAsc = [];
+  let sessionIndex = 1;
+
+  for (const log of allLogsAsc) {
+    if (log.activity === 'slip') {
+      const milestoneLogs = currentGroup.filter((l) => l.activity.startsWith('milestone_'));
+      const daysList = milestoneLogs.map((l) => parseInt(l.activity.replace('milestone_', '').replace('d', ''), 10) || 0);
+      const maxDays = daysList.length > 0 ? Math.max(...daysList) : 0;
+      const totalPoints = milestoneLogs.reduce((sum, l) => sum + l.points, 0);
+      const startDate = milestoneLogs.length > 0 ? milestoneLogs[0].logDate : log.logDate;
+
+      streakSessions.push({
+        id: `past-session-${sessionIndex++}`,
+        startDate,
+        endDate: log.logDate,
+        maxDays,
+        totalPoints,
+        milestonesCount: milestoneLogs.length,
+        isCurrent: false,
+      });
+      currentGroup = [];
+    } else if (log.activity.startsWith('milestone_')) {
+      currentGroup.push(log);
+    }
+  }
+
+  // Add active current streak session at top
+  streakSessions.unshift({
+    id: 'current-session',
+    startDate: status.currentStreakStart,
+    endDate: null,
+    maxDays: daysElapsed,
+    totalPoints: validMilestoneLogs.reduce((sum, l) => sum + l.points, 0),
+    milestonesCount: validMilestoneLogs.length,
+    isCurrent: true,
+  });
 
   return {
-    currentStageDays,
-    currentStagePoints,
+    currentStreakStart: status.currentStreakStart,
+    daysElapsed,
+    nextMilestoneDays,
+    nextMilestonePoints,
     claimedMilestones,
+    streakSessions,
+    ...(newlyAwardedMilestones.length > 0 ? { newlyAwardedMilestones } : {}),
   };
 }
 
-export async function claimMilestone(userId: string, db: Database) {
-  const status = await getRetentionStatus(userId, db);
+export async function startRetentionStreak(userId: string, startDate: string | undefined, db: Database) {
   const today = getISTDate();
+  const start = startDate || today;
 
-  const days = status.currentStageDays;
-  const points = status.currentStagePoints;
-  const activity = `milestone_${days}d`;
-
-  // Insert log entry for the retention milestone
-  const [logEntry] = await db.insert(activityLogs).values({
-    userId,
-    logDate: today,
-    category: 'retention',
-    activity,
-    points,
-    rulesVersion: RULES_VERSION,
-  }).returning();
-
-  // Advance stage target to next (+7 days)
-  await db.update(retentionStatus)
-    .set({
-      lastClaimedDays: days,
-      updatedAt: new Date(),
+  await db.insert(retentionStatus)
+    .values({
+      userId,
+      currentStreakStart: start,
+      lastClaimedDays: 0,
     })
-    .where(eq(retentionStatus.userId, userId));
+    .onConflictDoUpdate({
+      target: retentionStatus.userId,
+      set: {
+        currentStreakStart: start,
+        lastClaimedDays: 0,
+        updatedAt: new Date(),
+      },
+    });
 
-  const updatedStatus = await getRetentionStatus(userId, db);
+  return await getRetentionStatus(userId, db);
+}
 
-  return { logEntry, updatedStatus };
+export async function claimMilestone(userId: string, db: Database) {
+  return await getRetentionStatus(userId, db);
 }
 
 export async function logSlip(userId: string, db: Database) {
@@ -115,7 +205,7 @@ export async function logSlip(userId: string, db: Database) {
     rulesVersion: RULES_VERSION,
   });
   
-  // Reset target stage back to 7 days (0 penalty)
+  // Reset target streak start to today
   await db.update(retentionStatus)
     .set({
       currentStreakStart: today,

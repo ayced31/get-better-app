@@ -33,10 +33,24 @@ export type LeaderboardEntry = {
   previousSeasonRank?: string | null;
 };
 
+export type RetentionStreakSession = {
+  id: string;
+  startDate: string;
+  endDate: string | null;
+  maxDays: number;
+  totalPoints: number;
+  milestonesCount: number;
+  isCurrent?: boolean;
+};
+
 export type RetentionStatus = {
-  currentStageDays: number;
-  currentStagePoints: number;
+  currentStreakStart: string | null;
+  daysElapsed: number;
+  nextMilestoneDays: number;
+  nextMilestonePoints: number;
   claimedMilestones: { days: number; points: number; claimedAt: string }[];
+  streakSessions: RetentionStreakSession[];
+  newlyAwardedMilestones?: { days: number; points: number }[];
 };
 
 export type UserStats = {

@@ -78,7 +78,10 @@ export const CATEGORIES: Record<string, Category> = {
   lifestyle: {
     type: 'standard',
     label: 'Lifestyle',
-    activities: {},
+    activities: {
+      read_book: { label: 'Read Book (10 Pages)', points: 0.5 },
+      podcast: { label: 'Educational Podcast (30 min)', points: 0.5 },
+    },
     penalties: {
       youtube_2hr: { label: 'YouTube Video ≥ 2hrs', points: -2 },
       doomscrolling: { label: 'Doomscrolling ≥ 1hr', points: -2 },

@@ -76,9 +76,15 @@ export function Rules() {
         {/* Category: Lifestyle */}
         <Card className="p-md flex flex-col gap-xs">
           <h3 className="text-card-title">Lifestyle</h3>
-          <p className="text-caption text-tertiary">Mindful living penalties</p>
+          <p className="text-caption text-tertiary">Mindful living</p>
           <div className="flex flex-col gap-xxs text-body-sm text-subtle" style={{ marginTop: 'var(--space-xxs)' }}>
             <div className="flex justify-between">
+              <span>Read Book (10 Pages)</span><span className="text-success">+0.5</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Educational Podcast (30 min)</span><span className="text-success">+0.5</span>
+            </div>
+            <div className="flex justify-between" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: '4px', marginTop: '4px' }}>
               <span>YouTube ≥ 2hrs</span><span className="text-danger">-2</span>
             </div>
             <div className="flex justify-between">

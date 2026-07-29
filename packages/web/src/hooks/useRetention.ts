@@ -10,14 +10,28 @@ export function useRetentionStatus() {
   });
 }
 
-export function useClaimMilestone() {
+export function useStartRetention() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<{ log: any; status: RetentionStatus }>('/retention/claim'),
+    mutationFn: (startDate?: string) => api.post<RetentionStatus>('/retention/start', { startDate }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['retention'] });
       queryClient.invalidateQueries({ queryKey: ['userStats'] });
       queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
+}
+
+export function useClaimMilestone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<RetentionStatus>('/retention/claim'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['retention'] });
+      queryClient.invalidateQueries({ queryKey: ['userStats'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
   });
 }
@@ -25,10 +39,12 @@ export function useClaimMilestone() {
 export function useLogSlip() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<{ status: RetentionStatus }>('/retention/slip'),
+    mutationFn: () => api.post<RetentionStatus>('/retention/slip'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['retention'] });
       queryClient.invalidateQueries({ queryKey: ['userStats'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
     },
   });
 }
