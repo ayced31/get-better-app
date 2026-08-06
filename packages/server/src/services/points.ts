@@ -94,7 +94,7 @@ export async function calculatePoints(
     }
 
     const todaysPositiveTotal = todaysLogs
-      .filter((l) => l.points > 0)
+      .filter((l) => l.points > 0 && l.category !== 'retention')
       .reduce((sum, l) => sum + l.points, 0);
 
     const headroom = dailyCap - todaysPositiveTotal;
@@ -137,7 +137,7 @@ export async function getDailyCapStatus(
   }
 
   const globalPositiveUsed = todaysLogs
-    .filter((l) => l.points > 0)
+    .filter((l) => l.points > 0 && l.category !== 'retention')
     .reduce((sum, l) => sum + l.points, 0);
 
   const categoryCaps: Record<string, { used: number; cap: number | null }> = {};
@@ -230,6 +230,10 @@ export async function recalculateDailyPoints(
   const categoryCounts: Record<string, number> = {};
 
   for (const log of logs) {
+    // Skip retention logs — their points are managed by the retention service,
+    // not the daily points engine. Never recalculate or cap them.
+    if (log.category === 'retention') continue;
+
     const categoryDef = CATEGORIES[log.category as keyof typeof CATEGORIES];
     if (!categoryDef) continue;
 
