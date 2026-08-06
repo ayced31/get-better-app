@@ -33,7 +33,7 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
 
   // 2. Get claimed milestones history
   const logs = await db
-    .select({ activity: activityLogs.activity, points: activityLogs.points, createdAt: activityLogs.createdAt, logDate: activityLogs.logDate })
+    .select({ id: activityLogs.id, activity: activityLogs.activity, points: activityLogs.points, createdAt: activityLogs.createdAt, logDate: activityLogs.logDate })
     .from(activityLogs)
     .where(
       and(
@@ -52,6 +52,18 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
     validMilestoneLogs = milestoneLogs.filter((l) => l.createdAt > lastSlip.createdAt);
   } else {
     validMilestoneLogs = milestoneLogs.filter((l) => l.logDate >= status.currentStreakStart);
+  }
+
+  // Self-heal: repair any milestone logs whose points were zeroed out by the old recalculation bug
+  for (const log of validMilestoneLogs) {
+    const days = parseInt(log.activity.replace('milestone_', '').replace('d', ''), 10) || 0;
+    const expectedPoints = (days / 7) * 2;
+    if (days > 0 && log.points !== expectedPoints) {
+      await db.update(activityLogs)
+        .set({ points: expectedPoints, updatedAt: new Date() })
+        .where(eq(activityLogs.id, log.id));
+      log.points = expectedPoints;
+    }
   }
 
   const claimedDaysSet = new Set(
