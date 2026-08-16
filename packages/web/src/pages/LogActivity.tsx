@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ActivityCard } from '../components/features/ActivityCard';
 import { Skeleton } from '../components/ui/Skeleton';
-import { CATEGORIES, getISTDate, formatPointsSigned } from '@get-better/shared';
+import { CATEGORIES, getISTDate, formatPointsSigned, formatDisplayDate } from '@get-better/shared';
 import { useRetentionStatus, useStartRetention, useLogSlip, useDeleteRetentionSlip, useUpdateRetentionSlip } from '../hooks/useRetention';
 import { RetentionLeaderboard } from '../components/features/RetentionLeaderboard';
 
@@ -29,6 +29,7 @@ export function LogActivity() {
   const updateSlip = useUpdateRetentionSlip();
 
   const [startDateInput, setStartDateInput] = useState<string>(today);
+  const [showSlipsManagement, setShowSlipsManagement] = useState<boolean>(false);
 
   useEffect(() => {
     if (retentionStatus?.currentStreakStart) {
@@ -289,7 +290,7 @@ export function LogActivity() {
                     {/* Progress bar */}
                     <div className="flex flex-col gap-xxs mt-xs">
                       <div className="flex justify-between text-caption text-subtle">
-                        <span>Started: {retentionStatus.currentStreakStart || 'Not set'}</span>
+                        <span>Started: {retentionStatus.currentStreakStart ? formatDisplayDate(retentionStatus.currentStreakStart) : 'Not set'}</span>
                         <span>{retentionStatus.daysElapsed} / {retentionStatus.nextMilestoneDays} days</span>
                       </div>
                       <div style={{ height: '6px', backgroundColor: 'var(--color-surface-3)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
@@ -459,7 +460,8 @@ export function LogActivity() {
                                     </span>
                                   </div>
                                   <span className="text-caption text-tertiary">
-                                    {session.startDate} {session.endDate ? `– ${session.endDate}` : '– Present'}
+                                    {formatDisplayDate(session.startDate)}{' '}
+                                    {session.endDate ? `– ${formatDisplayDate(session.endDate)}` : '– Present'}
                                   </span>
                                 </div>
 
@@ -472,30 +474,6 @@ export function LogActivity() {
                                       {session.milestonesCount} Milestones
                                     </span>
                                   </div>
-
-                                  {session.slipLogId && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      style={{ color: 'var(--color-danger)', padding: '4px 8px' }}
-                                      loading={deleteSlip.isPending}
-                                      onClick={() => {
-                                        showConfirm('Delete this slip log? This will remove the slip record and restore your previous streak!', {
-                                          title: 'Delete Slip Log',
-                                          confirmLabel: 'Delete Slip',
-                                          onConfirm: () => {
-                                            deleteSlip.mutate(session.slipLogId!, {
-                                              onSuccess: () => {
-                                                showAlert('Slip log deleted and streak restored!', 'Success');
-                                              },
-                                            });
-                                          },
-                                        });
-                                      }}
-                                    >
-                                      Delete Slip
-                                    </Button>
-                                  )}
                                 </div>
                               </div>
                             );
@@ -504,78 +482,114 @@ export function LogActivity() {
                     </div>
                   )}
 
-                {/* Past Slips Management List */}
+                {/* Expandable Past Slips Management / Changes */}
                 {retentionStatus.slips && retentionStatus.slips.length > 0 && (
                   <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
-                    <span className="text-caption text-tertiary mb-xs">Logged Slips Management</span>
-                    <div className="flex flex-col gap-xs">
-                      {retentionStatus.slips.map((slip) => (
-                        <div
-                          key={slip.id}
-                          className="flex justify-between items-center p-xs"
+                    <button
+                      type="button"
+                      onClick={() => setShowSlipsManagement(!showSlipsManagement)}
+                      className="interactive flex justify-between items-center"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 'var(--space-xxs) 0',
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div className="flex items-center gap-xs">
+                        <span className="text-caption text-tertiary" style={{ fontWeight: 600 }}>
+                          ⚙️ Manage Slips & Changes
+                        </span>
+                        <span
+                          className="badge text-caption"
                           style={{
-                            backgroundColor: 'var(--color-surface-2)',
-                            border: '1px solid var(--color-hairline)',
-                            borderRadius: 'var(--radius-md)',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            fontSize: '10px',
+                            backgroundColor: 'var(--color-surface-3)',
+                            color: 'var(--color-ink-subtle)',
                           }}
                         >
-                          <div className="flex flex-col gap-xxs">
-                            <span className="text-body-sm text-danger" style={{ fontWeight: 600 }}>Masturbation Slip</span>
-                            <span className="text-caption text-tertiary">Logged Date: {slip.logDate}</span>
-                          </div>
+                          {retentionStatus.slips.length} {retentionStatus.slips.length === 1 ? 'slip' : 'slips'}
+                        </span>
+                      </div>
+                      <span className="text-caption text-muted" style={{ fontSize: '11px' }}>
+                        {showSlipsManagement ? '▲ Hide' : '▼ Expand'}
+                      </span>
+                    </button>
 
-                          <div className="flex items-center gap-xs">
-                            <input
-                              type="date"
-                              defaultValue={slip.logDate}
-                              style={{
-                                padding: '2px 6px',
-                                fontSize: '12px',
-                                borderRadius: 'var(--radius-sm)',
-                                border: '1px solid var(--color-hairline-strong)',
-                                backgroundColor: 'var(--color-surface-1)',
-                                color: 'var(--color-ink)',
-                              }}
-                              onChange={(e) => {
-                                const newDate = e.target.value;
-                                if (newDate && newDate !== slip.logDate) {
-                                  updateSlip.mutate(
-                                    { slipId: slip.id, logDate: newDate },
-                                    {
-                                      onSuccess: () => {
-                                        showAlert('Slip date updated!', 'Success');
-                                      },
-                                    }
-                                  );
-                                }
-                              }}
-                            />
+                    {showSlipsManagement && (
+                      <div className="flex flex-col gap-xs fade-in" style={{ marginTop: 'var(--space-xs)' }}>
+                        {retentionStatus.slips.map((slip) => (
+                          <div
+                            key={slip.id}
+                            className="flex justify-between items-center p-xs"
+                            style={{
+                              backgroundColor: 'var(--color-surface-2)',
+                              border: '1px solid var(--color-hairline)',
+                              borderRadius: 'var(--radius-md)',
+                            }}
+                          >
+                            <div className="flex flex-col gap-xxs">
+                              <span className="text-body-sm text-danger" style={{ fontWeight: 600 }}>Masturbation Slip</span>
+                              <span className="text-caption text-tertiary">Logged Date: {formatDisplayDate(slip.logDate)}</span>
+                            </div>
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              style={{ color: 'var(--color-danger)', padding: '2px 6px' }}
-                              loading={deleteSlip.isPending}
-                              onClick={() => {
-                                showConfirm(`Delete slip from ${slip.logDate}? This will restore your previous retention streak.`, {
-                                  title: 'Delete Slip',
-                                  confirmLabel: 'Delete',
-                                  onConfirm: () => {
-                                    deleteSlip.mutate(slip.id, {
-                                      onSuccess: () => {
-                                        showAlert('Slip deleted and retention streak restored!', 'Success');
-                                      },
-                                    });
-                                  },
-                                });
-                              }}
-                            >
-                              Delete
-                            </Button>
+                            <div className="flex items-center gap-xs">
+                              <input
+                                type="date"
+                                defaultValue={slip.logDate}
+                                style={{
+                                  padding: '2px 6px',
+                                  fontSize: '12px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: '1px solid var(--color-hairline-strong)',
+                                  backgroundColor: 'var(--color-surface-1)',
+                                  color: 'var(--color-ink)',
+                                }}
+                                onChange={(e) => {
+                                  const newDate = e.target.value;
+                                  if (newDate && newDate !== slip.logDate) {
+                                    updateSlip.mutate(
+                                      { slipId: slip.id, logDate: newDate },
+                                      {
+                                        onSuccess: () => {
+                                          showAlert('Slip date updated!', 'Success');
+                                        },
+                                      }
+                                    );
+                                  }
+                                }}
+                              />
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                style={{ color: 'var(--color-danger)', padding: '2px 6px' }}
+                                loading={deleteSlip.isPending}
+                                onClick={() => {
+                                  showConfirm(`Delete slip from ${slip.logDate}? This will restore your previous retention streak.`, {
+                                    title: 'Delete Slip',
+                                    confirmLabel: 'Delete',
+                                    onConfirm: () => {
+                                      deleteSlip.mutate(slip.id, {
+                                        onSuccess: () => {
+                                          showAlert('Slip deleted and retention streak restored!', 'Success');
+                                        },
+                                      });
+                                    },
+                                  });
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>

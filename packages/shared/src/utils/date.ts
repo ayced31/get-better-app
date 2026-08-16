@@ -78,3 +78,24 @@ export function getDateRange(start: string, end: string): string[] {
   }
   return dates;
 }
+
+/**
+ * Format 'YYYY-MM-DD' as 'DD-MM-YYYY'.
+ * e.g. '2026-08-16' → '16-08-2026'
+ */
+export function formatDisplayDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parts[0];
+    const month = parts[1];
+    const day = parts[2];
+    return `${day}-${month}-${year}`;
+  }
+  return dateStr;
+}
+
+export function formatDateDDMMYYYY(dateStr: string | null | undefined): string {
+  return formatDisplayDate(dateStr);
+}
+
