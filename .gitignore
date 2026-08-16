@@ -27,3 +27,5 @@ drizzle/meta/
 npm-debug.log*
 pnpm-debug.log*
 
+# thinking space for bugs/future updates
+changes.txt

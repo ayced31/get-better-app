@@ -15,6 +15,7 @@ export async function calculateStreak(userId: string, db: Database): Promise<num
     .where(
       and(
         eq(activityLogs.userId, userId),
+        sql`${activityLogs.category} NOT IN ('retention', 'streak_bonus')`,
         sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
       )
     )
@@ -58,6 +59,7 @@ export async function calculateMonthlyLogStreak(
         eq(activityLogs.userId, userId),
         sql`${activityLogs.logDate} >= ${monthStart}`,
         sql`${activityLogs.logDate} <= ${today}`,
+        sql`${activityLogs.category} NOT IN ('retention', 'streak_bonus')`,
         sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
       )
     )
@@ -102,7 +104,8 @@ export async function checkHighScoreStreak(
       and(
         eq(activityLogs.userId, userId),
         sql`${activityLogs.logDate} >= ${startDate}`,
-        sql`${activityLogs.logDate} <= ${logDate}`
+        sql`${activityLogs.logDate} <= ${logDate}`,
+        sql`${activityLogs.category} NOT IN ('retention', 'streak_bonus')`
       )
     );
 
