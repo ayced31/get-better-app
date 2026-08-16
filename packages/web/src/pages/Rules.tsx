@@ -36,12 +36,13 @@ export function Rules() {
         {/* Category: Physical */}
         <Card className="p-md flex flex-col gap-xs">
           <h3 className="text-card-title">Physical Activity</h3>
-          <p className="text-caption text-tertiary">Max 2 points daily</p>
+          <p className="text-caption text-tertiary">Max 3 points daily</p>
           <div className="flex flex-col gap-xxs text-body-sm text-subtle" style={{ marginTop: 'var(--space-xxs)' }}>
             <div className="flex justify-between"><span>10k Steps</span><span className="text-success">+1</span></div>
             <div className="flex justify-between"><span>Gym Session</span><span className="text-success">+1</span></div>
-            <div className="flex justify-between"><span>Running 3km+</span><span className="text-success">+1.5</span></div>
-            <div className="flex justify-between"><span>Calisthenics</span><span className="text-success">+0.5</span></div>
+            <div className="flex justify-between"><span>Running 3km+</span><span className="text-success">+2</span></div>
+            <div className="flex justify-between"><span>Calisthenics</span><span className="text-success">+1</span></div>
+            <div className="flex justify-between"><span>Rest Day</span><span className="text-subtle">0</span></div>
             <div className="flex justify-between" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: '4px', marginTop: '4px' }}>
               <span>2+ days gap between workouts</span>
               <span className="text-danger">-2</span>

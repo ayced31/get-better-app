@@ -32,7 +32,11 @@ export function ActivityCard({
     .join(' ');
 
   const pointsClass =
-    points > 0 ? 'activity-card__points--positive' : 'activity-card__points--negative';
+    points > 0
+      ? 'activity-card__points--positive'
+      : points < 0
+      ? 'activity-card__points--negative'
+      : 'activity-card__points--neutral';
 
   return (
     <div

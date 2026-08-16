@@ -13,7 +13,7 @@ const ALL_USERS_BACKFILL_TTL_MS = 10 * 60 * 1000; // 10 minutes cache for global
 
 function checkHasWorkoutInMemory(logsByDate: Map<string, any[]>, dateStr: string): boolean {
   const dayLogs = logsByDate.get(dateStr) || [];
-  return dayLogs.some((l: any) => l.category === 'physical' && l.activity !== 'workout_gap');
+  return dayLogs.some((l: any) => l.category === 'physical' && l.activity !== 'workout_gap' && l.activity !== 'rest_day');
 }
 
 function getConsecutiveMissedDaysInMemory(logsByDate: Map<string, any[]>, dateStr: string): number {
@@ -124,10 +124,10 @@ export async function backfillMissedDaysForUser(userId: string, dbClient: any = 
     }
 
     // 2. Check Workout Gap penalty: 3 consecutive days of no physical activity
-    const hasWorkoutToday = dayLogs.some((l: any) => l.category === 'physical' && l.activity !== 'workout_gap');
+    const hasWorkoutOrRestToday = dayLogs.some((l: any) => l.category === 'physical' && l.activity !== 'workout_gap');
     const workoutGapPenalty = dayLogs.find((l: any) => l.category === 'physical' && l.activity === 'workout_gap');
 
-    if (!hasWorkoutToday) {
+    if (!hasWorkoutOrRestToday) {
       const dayMinus1 = subtractDay(dateStr);
       const dayMinus2 = subtractDay(dayMinus1);
 

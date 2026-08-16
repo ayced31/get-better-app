@@ -104,3 +104,7 @@
 .activity-card__points--negative {
   color: var(--color-danger);
 }
+
+.activity-card__points--neutral {
+  color: var(--color-ink-subtle);
+}

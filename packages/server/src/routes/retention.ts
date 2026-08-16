@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { getRetentionStatus, startRetentionStreak, claimMilestone, logSlip, deleteRetentionSlip, updateRetentionSlip } from '../services/retention.js';
+import { getRetentionStatus, getRetentionLeaderboard, startRetentionStreak, claimMilestone, logSlip, deleteRetentionSlip, updateRetentionSlip } from '../services/retention.js';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -12,6 +12,15 @@ router.get('/status', async (req: AuthRequest, res) => {
     const userId = req.userId!;
     const status = await getRetentionStatus(userId, db);
     res.json({ success: true, data: status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/leaderboard', async (_req: AuthRequest, res) => {
+  try {
+    const leaderboard = await getRetentionLeaderboard(db);
+    res.json({ success: true, data: leaderboard });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -51,10 +51,10 @@ export async function calculatePoints(
 
   // 2. Check category daily cap
   if (categoryDef.maxDaily) {
-    const categoryLogsToday = todaysLogs.filter(
-      (l) => l.category === category && l.points > 0
-    );
-    if (categoryLogsToday.length >= categoryDef.maxDaily) {
+    const categoryPositiveTotal = todaysLogs
+      .filter((l) => l.category === category && l.points > 0)
+      .reduce((sum, l) => sum + l.points, 0);
+    if (categoryPositiveTotal >= categoryDef.maxDaily) {
       return { points: 0, blocked: false, reason: `Daily cap reached for ${categoryDef.label}. Points won't count.` };
     }
   }
@@ -81,8 +81,21 @@ export async function calculatePoints(
     }
   }
 
-  // 4. Enforce global daily cap for POSITIVE points
+  // 4. Enforce category cap and global daily cap for POSITIVE points
   if (points > 0) {
+    if (categoryDef.maxDaily) {
+      const categoryPositiveTotal = todaysLogs
+        .filter((l) => l.category === category && l.points > 0)
+        .reduce((sum, l) => sum + l.points, 0);
+      const categoryHeadroom = categoryDef.maxDaily - categoryPositiveTotal;
+      if (categoryHeadroom <= 0) {
+        return { points: 0, blocked: false, reason: `Daily cap reached for ${categoryDef.label}. Points won't count.` };
+      }
+      if (points > categoryHeadroom) {
+        points = categoryHeadroom;
+      }
+    }
+
     const hasStudied8hr = activity === 'study_8hr' || todaysLogs.some((l) => l.activity === 'study_8hr');
     const hasStudied6hr = activity === 'study_6hr' || todaysLogs.some((l) => l.activity === 'study_6hr');
     
@@ -142,9 +155,11 @@ export async function getDailyCapStatus(
 
   const categoryCaps: Record<string, { used: number; cap: number | null }> = {};
   for (const [key, cat] of Object.entries(CATEGORIES)) {
-    const catLogs = todaysLogs.filter((l) => l.category === key && l.points > 0);
+    const catPositiveUsed = todaysLogs
+      .filter((l) => l.category === key && l.points > 0)
+      .reduce((sum, l) => sum + l.points, 0);
     categoryCaps[key] = {
-      used: catLogs.length,
+      used: catPositiveUsed,
       cap: cat.maxDaily ?? null,
     };
   }
@@ -227,7 +242,7 @@ export async function recalculateDailyPoints(
   }
 
   let currentPositiveTotal = 0;
-  const categoryCounts: Record<string, number> = {};
+  const categoryPointsTotal: Record<string, number> = {};
 
   for (const log of logs) {
     // Skip retention logs — their points are managed by the retention service,
@@ -260,25 +275,31 @@ export async function recalculateDailyPoints(
     let finalPoints = basePoints;
 
     if (basePoints > 0) {
+      let allowedPoints = basePoints;
+
       // Check category daily cap
-      const categoryCount = categoryCounts[log.category] ?? 0;
-      if (categoryDef.maxDaily && categoryCount >= categoryDef.maxDaily) {
-        finalPoints = 0;
-      } else {
-        // Apply global cap
-        const headroom = dailyCap - currentPositiveTotal;
-        if (headroom <= 0) {
-          finalPoints = 0;
-        } else if (basePoints > headroom) {
-          finalPoints = headroom;
-          currentPositiveTotal += headroom;
-          categoryCounts[log.category] = categoryCount + 1;
-        } else {
-          finalPoints = basePoints;
-          currentPositiveTotal += basePoints;
-          categoryCounts[log.category] = categoryCount + 1;
+      if (categoryDef.maxDaily) {
+        const currentCategoryTotal = categoryPointsTotal[log.category] ?? 0;
+        const categoryHeadroom = categoryDef.maxDaily - currentCategoryTotal;
+        if (categoryHeadroom <= 0) {
+          allowedPoints = 0;
+        } else if (allowedPoints > categoryHeadroom) {
+          allowedPoints = categoryHeadroom;
         }
       }
+
+      // Apply global cap
+      const headroom = dailyCap - currentPositiveTotal;
+      if (headroom <= 0) {
+        finalPoints = 0;
+      } else if (allowedPoints > headroom) {
+        finalPoints = headroom;
+      } else {
+        finalPoints = allowedPoints;
+      }
+
+      currentPositiveTotal += finalPoints;
+      categoryPointsTotal[log.category] = (categoryPointsTotal[log.category] ?? 0) + finalPoints;
     }
 
     // C. Update the database if the points calculated now differ from what is stored

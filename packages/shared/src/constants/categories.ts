@@ -44,12 +44,13 @@ export const CATEGORIES: Record<string, Category> = {
   physical: {
     type: 'standard',
     label: 'Physical Activity',
-    maxDaily: 2,
+    maxDaily: 3,
     activities: {
       steps_10k: { label: '10k Steps', points: 1 },
       gym: { label: 'Gym', points: 1 },
-      running_3km: { label: 'Running 3km+ (Outdoor)', points: 1.5 },
-      calisthenics: { label: 'Calisthenics', points: 0.5 },
+      running_3km: { label: 'Running 3km+ (Outdoor)', points: 2 },
+      calisthenics: { label: 'Calisthenics', points: 1 },
+      rest_day: { label: 'Rest Day', points: 0 },
     },
     penalties: {
       workout_gap: { label: '2+ day gap between workouts', points: -2 },

@@ -316,7 +316,7 @@ export function History() {
         <Card className="p-md flex flex-col gap-xxs">
           <span className="text-caption text-tertiary text-uppercase">Workouts Completed</span>
           <span className="text-display-sm" style={{ fontWeight: 600 }}>{monthlyStats.workoutCount}</span>
-          <span className="text-caption text-muted">Gym, Steps & Yoga sessions</span>
+          <span className="text-caption text-muted">Gym, Steps, Running & Calisthenics</span>
         </Card>
         <Card className="p-md flex flex-col gap-xxs">
           <span className="text-caption text-tertiary text-uppercase">Study Log Hours</span>
@@ -326,7 +326,7 @@ export function History() {
         <Card className="p-md flex flex-col gap-xxs">
           <span className="text-caption text-tertiary text-uppercase">Masturbation Slips</span>
           <span className="text-display-sm text-danger" style={{ fontWeight: 600 }}>{monthlyStats.slipsCount}</span>
-          <span className="text-caption text-muted">Resets after 5 occurrences</span>
+          <span className="text-caption text-muted">Resets retention streak</span>
         </Card>
         <Card className="p-md flex flex-col gap-xxs">
           <span className="text-caption text-tertiary text-uppercase">Late Sleeping Days</span>

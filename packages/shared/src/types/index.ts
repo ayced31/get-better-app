@@ -47,7 +47,18 @@ export type RetentionStreakSession = {
   totalPoints: number;
   milestonesCount: number;
   isCurrent?: boolean;
+  isLastEnded?: boolean;
+  isLongest?: boolean;
+  isSecondLongest?: boolean;
   slipLogId?: string;
+};
+
+export type RetentionLeaderboardEntry = {
+  user: User;
+  currentStreak: number;
+  longestStreak: number;
+  totalPoints: number;
+  rank: number;
 };
 
 export type RetentionStatus = {

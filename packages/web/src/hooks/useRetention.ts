@@ -1,11 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { RetentionStatus } from '@get-better/shared';
+import type { RetentionStatus, RetentionLeaderboardEntry } from '@get-better/shared';
 import { api } from '../api/client';
 
 export function useRetentionStatus() {
   return useQuery({
     queryKey: ['retention'],
     queryFn: () => api.get<RetentionStatus>('/retention/status'),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useRetentionLeaderboard() {
+  return useQuery({
+    queryKey: ['retentionLeaderboard'],
+    queryFn: () => api.get<RetentionLeaderboardEntry[]>('/retention/leaderboard'),
     staleTime: 30 * 1000,
   });
 }

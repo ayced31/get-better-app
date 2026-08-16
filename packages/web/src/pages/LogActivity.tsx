@@ -8,6 +8,7 @@ import { ActivityCard } from '../components/features/ActivityCard';
 import { Skeleton } from '../components/ui/Skeleton';
 import { CATEGORIES, getISTDate, formatPointsSigned } from '@get-better/shared';
 import { useRetentionStatus, useStartRetention, useLogSlip, useDeleteRetentionSlip, useUpdateRetentionSlip } from '../hooks/useRetention';
+import { RetentionLeaderboard } from '../components/features/RetentionLeaderboard';
 
 type CategoryKey = 'physical' | 'diet' | 'sleep' | 'study' | 'lifestyle' | 'retention';
 
@@ -244,296 +245,344 @@ export function LogActivity() {
           isRetentionLoading ? (
             <Skeleton height="240px" />
           ) : retentionStatus ? (
-            <Card className="p-lg flex flex-col gap-md" style={{ maxWidth: '560px' }}>
-              <div>
-                <h3 className="text-body" style={{ fontWeight: 600 }}>Semen Retention</h3>
-                <p className="text-caption text-tertiary" style={{ marginTop: 'var(--space-xxs)' }}>
-                  Set your streak start date to begin. The app automatically calculates your elapsed days and awards milestone points (every 7 days = +2 pts).
-                </p>
-              </div>
+            <div
+              className="grid gap-md"
+              style={{
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                alignItems: 'start',
+              }}
+            >
+              {/* Left Column: Retention Streak Tracker */}
+              <Card className="p-lg flex flex-col gap-md" style={{ width: '100%' }}>
+                <div>
+                  <h3 className="text-body" style={{ fontWeight: 600 }}>Semen Retention</h3>
+                  <p className="text-caption text-tertiary" style={{ marginTop: 'var(--space-xxs)' }}>
+                    Set your streak start date to begin. The app automatically calculates your elapsed days and awards milestone points (every 7 days = +2 pts).
+                  </p>
+                </div>
 
-              {/* Streak Overview Card (Shown if streak has started) */}
-              {retentionStatus.hasStarted ? (
-                <div
-                  className="flex flex-col gap-xs p-md"
-                  style={{
-                    backgroundColor: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-hairline-strong)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="flex flex-col gap-xxs">
-                      <span className="text-caption text-tertiary uppercase">Current Streak</span>
-                      <span className="text-display-md text-success" style={{ fontWeight: 700 }}>
-                        {retentionStatus.daysElapsed} Days
-                      </span>
+                {/* Streak Overview Card (Shown if streak has started) */}
+                {retentionStatus.hasStarted ? (
+                  <div
+                    className="flex flex-col gap-xs p-md"
+                    style={{
+                      backgroundColor: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-hairline-strong)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col gap-xxs">
+                        <span className="text-caption text-tertiary uppercase">Current Streak</span>
+                        <span className="text-display-md text-success" style={{ fontWeight: 700 }}>
+                          {retentionStatus.daysElapsed} Days
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end gap-xxs">
+                        <span className="text-caption text-tertiary">Next Goal: {retentionStatus.nextMilestoneDays} Days</span>
+                        <span className="text-body-sm text-success" style={{ fontWeight: 600 }}>
+                          +{retentionStatus.nextMilestonePoints} pts
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-xxs">
-                      <span className="text-caption text-tertiary">Next Goal: {retentionStatus.nextMilestoneDays} Days</span>
-                      <span className="text-body-sm text-success" style={{ fontWeight: 600 }}>
-                        +{retentionStatus.nextMilestonePoints} pts
-                      </span>
+
+                    {/* Progress bar */}
+                    <div className="flex flex-col gap-xxs mt-xs">
+                      <div className="flex justify-between text-caption text-subtle">
+                        <span>Started: {retentionStatus.currentStreakStart || 'Not set'}</span>
+                        <span>{retentionStatus.daysElapsed} / {retentionStatus.nextMilestoneDays} days</span>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--color-surface-3)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${Math.min(100, (retentionStatus.daysElapsed / retentionStatus.nextMilestoneDays) * 100)}%`,
+                            backgroundColor: 'var(--color-success)',
+                            borderRadius: 'var(--radius-pill)',
+                            transition: 'width 0.3s ease',
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div
+                    className="p-md text-center"
+                    style={{
+                      backgroundColor: 'var(--color-surface-2)',
+                      border: '1px dashed var(--color-hairline-strong)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <p className="text-body-sm text-subtle">
+                      No active retention streak yet. Select your start date below and click <strong>Start</strong> to begin tracking!
+                    </p>
+                  </div>
+                )}
 
-                  {/* Progress bar */}
-                  <div className="flex flex-col gap-xxs mt-xs">
-                    <div className="flex justify-between text-caption text-subtle">
-                      <span>Started: {retentionStatus.currentStreakStart || 'Not set'}</span>
-                      <span>{retentionStatus.daysElapsed} / {retentionStatus.nextMilestoneDays} days</span>
-                    </div>
-                    <div style={{ height: '6px', backgroundColor: 'var(--color-surface-3)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
-                      <div
+                {/* Actions */}
+                <div className="flex flex-col gap-sm">
+                  <div className="flex gap-sm items-end">
+                    <div className="flex flex-col flex-1 gap-xxs">
+                      <label className="text-caption text-tertiary">
+                        {retentionStatus.hasStarted ? 'Streak Start Date' : 'Set Start Date'}
+                      </label>
+                      <input
+                        type="date"
+                        className="input-field"
+                        value={startDateInput}
+                        onChange={(e) => setStartDateInput(e.target.value)}
                         style={{
-                          height: '100%',
-                          width: `${Math.min(100, (retentionStatus.daysElapsed / retentionStatus.nextMilestoneDays) * 100)}%`,
-                          backgroundColor: 'var(--color-success)',
-                          borderRadius: 'var(--radius-pill)',
-                          transition: 'width 0.3s ease',
+                          padding: 'var(--space-xs) var(--space-sm)',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px solid var(--color-hairline-strong)',
+                          backgroundColor: 'var(--color-surface-1)',
+                          color: 'var(--color-ink)',
                         }}
                       />
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="p-md text-center"
-                  style={{
-                    backgroundColor: 'var(--color-surface-2)',
-                    border: '1px dashed var(--color-hairline-strong)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <p className="text-body-sm text-subtle">
-                    No active retention streak yet. Select your start date below and click <strong>Start</strong> to begin tracking!
-                  </p>
-                </div>
-              )}
 
-              {/* Actions */}
-              <div className="flex flex-col gap-sm">
-                <div className="flex gap-sm items-end">
-                  <div className="flex flex-col flex-1 gap-xxs">
-                    <label className="text-caption text-tertiary">
-                      {retentionStatus.hasStarted ? 'Streak Start Date' : 'Set Start Date'}
-                    </label>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={startDateInput}
-                      onChange={(e) => setStartDateInput(e.target.value)}
-                      style={{
-                        padding: 'var(--space-xs) var(--space-sm)',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--color-hairline-strong)',
-                        backgroundColor: 'var(--color-surface-1)',
-                        color: 'var(--color-ink)',
-                      }}
-                    />
-                  </div>
-
-                  <Button
-                    style={{
-                      backgroundColor: 'var(--color-success)',
-                      color: '#000',
-                      fontWeight: 600,
-                      height: '38px',
-                    }}
-                    loading={startRetention.isPending}
-                    onClick={() => {
-                      startRetention.mutate(startDateInput, {
-                        onSuccess: (res: any) => {
-                          const newlyAwarded = res?.data?.newlyAwardedMilestones;
-                          if (newlyAwarded && newlyAwarded.length > 0) {
-                            newlyAwarded.forEach((m: any) => {
-                              showAlert(`🎉 Congratulations! You reached the ${m.days}-day milestone (+${m.points} pts)!`, 'Success');
-                            });
-                          } else {
-                            showAlert('Retention streak activated!', 'Success');
-                          }
-                        },
-                        onError: (err: any) => {
-                          showAlert(err.message || 'Failed to set start date', 'Error');
-                        },
-                      });
-                    }}
-                  >
-                    Start
-                  </Button>
-
-                  {retentionStatus.hasStarted && (
                     <Button
-                      variant="danger"
-                      style={{ height: '38px' }}
-                      loading={logSlip.isPending}
+                      style={{
+                        backgroundColor: 'var(--color-success)',
+                        color: '#000',
+                        fontWeight: 600,
+                        height: '38px',
+                      }}
+                      loading={startRetention.isPending}
                       onClick={() => {
-                        showConfirm('Are you logging a masturbation slip? This will reset your start date to today (0 penalty).', {
-                          title: 'Report Slip',
-                          confirmLabel: 'Reset Start Date to Today',
-                          onConfirm: () => {
-                            logSlip.mutate(undefined, {
-                              onSuccess: () => {
-                                setStartDateInput(today);
-                                showAlert('Slip logged. Your streak start date has been reset to today.', 'Warning');
-                              },
-                            });
+                        startRetention.mutate(startDateInput, {
+                          onSuccess: (res: any) => {
+                            const newlyAwarded = res?.data?.newlyAwardedMilestones;
+                            if (newlyAwarded && newlyAwarded.length > 0) {
+                              newlyAwarded.forEach((m: any) => {
+                                showAlert(`🎉 Congratulations! You reached the ${m.days}-day milestone (+${m.points} pts)!`, 'Success');
+                              });
+                            } else {
+                              showAlert('Retention streak activated!', 'Success');
+                            }
+                          },
+                          onError: (err: any) => {
+                            showAlert(err.message || 'Failed to set start date', 'Error');
                           },
                         });
                       }}
                     >
-                      Slip
+                      Start
                     </Button>
-                  )}
-                </div>
-              </div>
 
-              {/* Retention Streak Sessions History (Only shown if history sessions exist) */}
-              {retentionStatus.hasStarted && retentionStatus.streakSessions && retentionStatus.streakSessions.length > 0 && (
-                <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
-                  <span className="text-caption text-tertiary mb-xs">Retention Streak History Sessions</span>
-                  <div className="flex flex-col gap-xs">
-                    {retentionStatus.streakSessions.map((session) => (
-                      <div
-                        key={session.id}
-                        className="flex justify-between items-center p-sm"
-                        style={{
-                          backgroundColor: session.isCurrent ? 'var(--color-surface-2)' : 'var(--color-surface-1)',
-                          border: session.isCurrent ? '1px solid var(--color-success)' : '1px solid var(--color-hairline)',
-                          borderRadius: 'var(--radius-md)',
+                    {retentionStatus.hasStarted && (
+                      <Button
+                        variant="danger"
+                        style={{ height: '38px' }}
+                        loading={logSlip.isPending}
+                        onClick={() => {
+                          showConfirm('Are you logging a masturbation slip? This will reset your start date to today (0 penalty).', {
+                            title: 'Report Slip',
+                            confirmLabel: 'Reset Start Date to Today',
+                            onConfirm: () => {
+                              logSlip.mutate(undefined, {
+                                onSuccess: () => {
+                                  setStartDateInput(today);
+                                  showAlert('Slip logged. Your streak start date has been reset to today.', 'Warning');
+                                },
+                              });
+                            },
+                          });
                         }}
                       >
-                        <div className="flex flex-col gap-xxs">
+                        Slip
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Retention Streak Sessions History (Curated: Last Ended, Longest, 2nd Longest) */}
+                {retentionStatus.hasStarted &&
+                  retentionStatus.streakSessions &&
+                  retentionStatus.streakSessions.filter((s) => !s.isCurrent).length > 0 && (
+                    <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
+                      <div className="flex justify-between items-center mb-xxs">
+                        <span className="text-caption text-tertiary">Notable Past Streaks</span>
+                        <span className="text-caption text-muted">
+                          {retentionStatus.streakSessions.filter((s) => !s.isCurrent).length}{' '}
+                          {retentionStatus.streakSessions.filter((s) => !s.isCurrent).length === 1 ? 'streak' : 'streaks'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-xs">
+                        {retentionStatus.streakSessions
+                          .filter((s) => !s.isCurrent)
+                          .map((session) => {
+                            const badgeText = session.isLastEnded
+                              ? session.isLongest
+                                ? '🔄 Last Ended (🏆 Longest)'
+                                : '🔄 Last Ended'
+                              : session.isLongest
+                              ? '🏆 Longest'
+                              : session.isSecondLongest
+                              ? '🥈 2nd Longest'
+                              : 'Past Streak';
+
+                            return (
+                              <div
+                                key={session.id}
+                                className="flex justify-between items-center p-sm"
+                                style={{
+                                  backgroundColor: 'var(--color-surface-1)',
+                                  border: session.isLastEnded
+                                    ? '1px solid var(--color-hairline-strong)'
+                                    : '1px solid var(--color-hairline)',
+                                  borderRadius: 'var(--radius-md)',
+                                }}
+                              >
+                                <div className="flex flex-col gap-xxs">
+                                  <div className="flex items-center gap-xs">
+                                    <span className="text-body-sm" style={{ fontWeight: 600 }}>
+                                      📜 {session.maxDays} Days
+                                    </span>
+                                    <span
+                                      className="badge text-caption"
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '10px',
+                                        backgroundColor: session.isLastEnded
+                                          ? 'rgba(39, 166, 68, 0.12)'
+                                          : 'var(--color-surface-3)',
+                                        color: session.isLastEnded
+                                          ? 'var(--color-success)'
+                                          : 'var(--color-ink-subtle)',
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {badgeText}
+                                    </span>
+                                  </div>
+                                  <span className="text-caption text-tertiary">
+                                    {session.startDate} {session.endDate ? `– ${session.endDate}` : '– Present'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-md">
+                                  <div className="flex flex-col items-end gap-xxs">
+                                    <span className="text-body-sm text-success" style={{ fontWeight: 700 }}>
+                                      +{session.totalPoints} pts
+                                    </span>
+                                    <span className="text-caption text-muted">
+                                      {session.milestonesCount} Milestones
+                                    </span>
+                                  </div>
+
+                                  {session.slipLogId && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      style={{ color: 'var(--color-danger)', padding: '4px 8px' }}
+                                      loading={deleteSlip.isPending}
+                                      onClick={() => {
+                                        showConfirm('Delete this slip log? This will remove the slip record and restore your previous streak!', {
+                                          title: 'Delete Slip Log',
+                                          confirmLabel: 'Delete Slip',
+                                          onConfirm: () => {
+                                            deleteSlip.mutate(session.slipLogId!, {
+                                              onSuccess: () => {
+                                                showAlert('Slip log deleted and streak restored!', 'Success');
+                                              },
+                                            });
+                                          },
+                                        });
+                                      }}
+                                    >
+                                      Delete Slip
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Past Slips Management List */}
+                {retentionStatus.slips && retentionStatus.slips.length > 0 && (
+                  <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
+                    <span className="text-caption text-tertiary mb-xs">Logged Slips Management</span>
+                    <div className="flex flex-col gap-xs">
+                      {retentionStatus.slips.map((slip) => (
+                        <div
+                          key={slip.id}
+                          className="flex justify-between items-center p-xs"
+                          style={{
+                            backgroundColor: 'var(--color-surface-2)',
+                            border: '1px solid var(--color-hairline)',
+                            borderRadius: 'var(--radius-md)',
+                          }}
+                        >
+                          <div className="flex flex-col gap-xxs">
+                            <span className="text-body-sm text-danger" style={{ fontWeight: 600 }}>Masturbation Slip</span>
+                            <span className="text-caption text-tertiary">Logged Date: {slip.logDate}</span>
+                          </div>
+
                           <div className="flex items-center gap-xs">
-                            <span className="text-body-sm" style={{ fontWeight: 600 }}>
-                              {session.isCurrent ? '🔥 Current Streak' : `📜 ${session.maxDays} Days Streak`}
-                            </span>
-                            {session.isCurrent ? (
-                              <span className="badge badge--success text-caption" style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px' }}>Active</span>
-                            ) : (
-                              <span className="badge text-caption" style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-ink-subtle)' }}>Ended with Slip</span>
-                            )}
-                          </div>
-                          <span className="text-caption text-tertiary">
-                            {session.startDate} {session.endDate ? `– ${session.endDate}` : '– Present'}
-                          </span>
-                        </div>
+                            <input
+                              type="date"
+                              defaultValue={slip.logDate}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '12px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--color-hairline-strong)',
+                                backgroundColor: 'var(--color-surface-1)',
+                                color: 'var(--color-ink)',
+                              }}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                if (newDate && newDate !== slip.logDate) {
+                                  updateSlip.mutate(
+                                    { slipId: slip.id, logDate: newDate },
+                                    {
+                                      onSuccess: () => {
+                                        showAlert('Slip date updated!', 'Success');
+                                      },
+                                    }
+                                  );
+                                }
+                              }}
+                            />
 
-                        <div className="flex items-center gap-md">
-                          <div className="flex flex-col items-end gap-xxs">
-                            <span className="text-body-sm text-success" style={{ fontWeight: 700 }}>
-                              +{session.totalPoints} pts
-                            </span>
-                            <span className="text-caption text-muted">
-                              {session.milestonesCount} Milestones
-                            </span>
-                          </div>
-
-                          {!session.isCurrent && session.slipLogId && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              style={{ color: 'var(--color-danger)', padding: '4px 8px' }}
+                              style={{ color: 'var(--color-danger)', padding: '2px 6px' }}
                               loading={deleteSlip.isPending}
                               onClick={() => {
-                                showConfirm('Delete this slip log? This will remove the slip record and restore your previous streak!', {
-                                  title: 'Delete Slip Log',
-                                  confirmLabel: 'Delete Slip',
+                                showConfirm(`Delete slip from ${slip.logDate}? This will restore your previous retention streak.`, {
+                                  title: 'Delete Slip',
+                                  confirmLabel: 'Delete',
                                   onConfirm: () => {
-                                    deleteSlip.mutate(session.slipLogId!, {
+                                    deleteSlip.mutate(slip.id, {
                                       onSuccess: () => {
-                                        showAlert('Slip log deleted and streak restored!', 'Success');
+                                        showAlert('Slip deleted and retention streak restored!', 'Success');
                                       },
                                     });
                                   },
                                 });
                               }}
                             >
-                              Delete Slip
+                              Delete
                             </Button>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </Card>
 
-              {/* Past Slips Management List */}
-              {retentionStatus.slips && retentionStatus.slips.length > 0 && (
-                <div className="flex flex-col gap-xs mt-sm" style={{ borderTop: '1px solid var(--color-hairline)', paddingTop: 'var(--space-md)' }}>
-                  <span className="text-caption text-tertiary mb-xs">Logged Slips Management</span>
-                  <div className="flex flex-col gap-xs">
-                    {retentionStatus.slips.map((slip) => (
-                      <div
-                        key={slip.id}
-                        className="flex justify-between items-center p-xs"
-                        style={{
-                          backgroundColor: 'var(--color-surface-2)',
-                          border: '1px solid var(--color-hairline)',
-                          borderRadius: 'var(--radius-md)',
-                        }}
-                      >
-                        <div className="flex flex-col gap-xxs">
-                          <span className="text-body-sm text-danger" style={{ fontWeight: 600 }}>Masturbation Slip</span>
-                          <span className="text-caption text-tertiary">Logged Date: {slip.logDate}</span>
-                        </div>
-
-                        <div className="flex items-center gap-xs">
-                          <input
-                            type="date"
-                            defaultValue={slip.logDate}
-                            style={{
-                              padding: '2px 6px',
-                              fontSize: '12px',
-                              borderRadius: 'var(--radius-sm)',
-                              border: '1px solid var(--color-hairline-strong)',
-                              backgroundColor: 'var(--color-surface-1)',
-                              color: 'var(--color-ink)',
-                            }}
-                            onChange={(e) => {
-                              const newDate = e.target.value;
-                              if (newDate && newDate !== slip.logDate) {
-                                updateSlip.mutate(
-                                  { slipId: slip.id, logDate: newDate },
-                                  {
-                                    onSuccess: () => {
-                                      showAlert('Slip date updated!', 'Success');
-                                    },
-                                  }
-                                );
-                              }
-                            }}
-                          />
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            style={{ color: 'var(--color-danger)', padding: '2px 6px' }}
-                            loading={deleteSlip.isPending}
-                            onClick={() => {
-                              showConfirm(`Delete slip from ${slip.logDate}? This will restore your previous retention streak.`, {
-                                title: 'Delete Slip',
-                                confirmLabel: 'Delete',
-                                onConfirm: () => {
-                                  deleteSlip.mutate(slip.id, {
-                                    onSuccess: () => {
-                                      showAlert('Slip deleted and retention streak restored!', 'Success');
-                                    },
-                                  });
-                                },
-                              });
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
+              {/* Right Column (Desktop) / Below (Mobile): Retention Leaderboard */}
+              <RetentionLeaderboard />
+            </div>
           ) : (
             <Card className="p-md text-center text-muted">
               Failed to load retention status. Please try again.

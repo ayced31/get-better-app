@@ -1,8 +1,8 @@
 import { eq, and, desc } from 'drizzle-orm';
-import { activityLogs, retentionStatus } from '../db/schema.js';
+import { activityLogs, retentionStatus, users } from '../db/schema.js';
 import { getISTDate } from '@get-better/shared';
 import type { Database } from '../db/index.js';
-import type { RetentionStatus } from '@get-better/shared';
+import type { RetentionStatus, RetentionLeaderboardEntry, RetentionStreakSession } from '@get-better/shared';
 
 const RULES_VERSION = 'v2';
 
@@ -140,7 +140,7 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
       createdAt: l.createdAt.toISOString(),
     }));
 
-  const streakSessions: any[] = [];
+  const allPastSessions: RetentionStreakSession[] = [];
   let currentGroup: typeof allLogsAsc = [];
   let sessionIndex = 1;
 
@@ -152,7 +152,7 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
       const totalPoints = milestoneLogs.reduce((sum, l) => sum + l.points, 0);
       const startDate = milestoneLogs.length > 0 ? milestoneLogs[0].logDate : log.logDate;
 
-      streakSessions.push({
+      allPastSessions.push({
         id: `past-session-${sessionIndex++}`,
         startDate,
         endDate: log.logDate,
@@ -167,6 +167,56 @@ export async function getRetentionStatus(userId: string, db: Database): Promise<
       currentGroup.push(log);
     }
   }
+
+  // Curate past sessions: Only keep the last streak (with delete slip), longest streak, and 2nd longest streak
+  const curatedPastSessions: RetentionStreakSession[] = [];
+  const includedIds = new Set<string>();
+
+  if (allPastSessions.length > 0) {
+    // 1. Last ended streak (most recent past session, has slipLogId)
+    const lastEnded = { ...allPastSessions[allPastSessions.length - 1] };
+    lastEnded.isLastEnded = true;
+    curatedPastSessions.push(lastEnded);
+    includedIds.add(lastEnded.id);
+
+    // Check if lastEnded is also the overall longest
+    const overallLongest = [...allPastSessions].sort((a, b) => b.maxDays - a.maxDays || b.totalPoints - a.totalPoints)[0];
+    if (overallLongest && overallLongest.id === lastEnded.id) {
+      lastEnded.isLongest = true;
+    }
+
+    // 2. Longest past session from the rest
+    const remaining1 = allPastSessions
+      .filter((s) => !includedIds.has(s.id))
+      .sort((a, b) => b.maxDays - a.maxDays || b.totalPoints - a.totalPoints);
+
+    if (remaining1.length > 0) {
+      const longest = { ...remaining1[0] };
+      if (!lastEnded.isLongest) {
+        longest.isLongest = true;
+      } else {
+        longest.isSecondLongest = true;
+      }
+      curatedPastSessions.push(longest);
+      includedIds.add(longest.id);
+    }
+
+    // 3. 2nd longest past session from the rest
+    const remaining2 = allPastSessions
+      .filter((s) => !includedIds.has(s.id))
+      .sort((a, b) => b.maxDays - a.maxDays || b.totalPoints - a.totalPoints);
+
+    if (remaining2.length > 0) {
+      const secondLongest = { ...remaining2[0] };
+      if (!lastEnded.isLongest && !curatedPastSessions.some((s) => s.isSecondLongest)) {
+        secondLongest.isSecondLongest = true;
+      }
+      curatedPastSessions.push(secondLongest);
+      includedIds.add(secondLongest.id);
+    }
+  }
+
+  const streakSessions: RetentionStreakSession[] = [...curatedPastSessions];
 
   // Add active current streak session at top if streak has started
   if (hasStarted) {
@@ -323,4 +373,115 @@ export async function updateRetentionSlip(userId: string, slipId: string, newDat
   }
 
   return await getRetentionStatus(userId, db);
+}
+
+export async function getRetentionLeaderboard(db: Database): Promise<RetentionLeaderboardEntry[]> {
+  const today = getISTDate();
+
+  // 1. Fetch all users who have a retention status row
+  const allUsersWithRetention = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      createdAt: users.createdAt,
+      currentStreakStart: retentionStatus.currentStreakStart,
+      lastClaimedDays: retentionStatus.lastClaimedDays,
+    })
+    .from(users)
+    .innerJoin(retentionStatus, eq(retentionStatus.userId, users.id));
+
+  if (allUsersWithRetention.length === 0) {
+    return [];
+  }
+
+  // 2. Fetch all retention logs in a single query
+  const allRetentionLogs = await db
+    .select({
+      userId: activityLogs.userId,
+      activity: activityLogs.activity,
+      points: activityLogs.points,
+      createdAt: activityLogs.createdAt,
+      logDate: activityLogs.logDate,
+    })
+    .from(activityLogs)
+    .where(eq(activityLogs.category, 'retention'))
+    .orderBy(activityLogs.createdAt);
+
+  const logsByUser = new Map<string, typeof allRetentionLogs>();
+  for (const log of allRetentionLogs) {
+    const list = logsByUser.get(log.userId) || [];
+    list.push(log);
+    logsByUser.set(log.userId, list);
+  }
+
+  const entries: RetentionLeaderboardEntry[] = [];
+
+  for (const userRow of allUsersWithRetention) {
+    const userLogs = logsByUser.get(userRow.id) || [];
+    const currentStreak = userRow.currentStreakStart
+      ? calculateDaysElapsed(userRow.currentStreakStart, today)
+      : 0;
+
+    // Calculate total points from milestone logs
+    const milestoneLogs = userLogs.filter((l) => l.activity.startsWith('milestone_'));
+    const totalPoints = milestoneLogs.reduce((sum, l) => sum + l.points, 0);
+
+    // Calculate longest streak from history + current streak
+    let longestStreak = currentStreak;
+    let currentGroupDays: number[] = [];
+
+    for (const log of userLogs) {
+      if (log.activity === 'slip') {
+        const maxInGroup = currentGroupDays.length > 0 ? Math.max(...currentGroupDays) : 0;
+        if (maxInGroup > longestStreak) {
+          longestStreak = maxInGroup;
+        }
+        currentGroupDays = [];
+      } else if (log.activity.startsWith('milestone_')) {
+        const days = parseInt(log.activity.replace('milestone_', '').replace('d', ''), 10) || 0;
+        currentGroupDays.push(days);
+      }
+    }
+    if (userRow.lastClaimedDays > longestStreak) {
+      longestStreak = userRow.lastClaimedDays;
+    }
+
+    entries.push({
+      user: {
+        id: userRow.id,
+        username: userRow.username,
+        email: '',
+        displayName: userRow.displayName,
+        avatarUrl: userRow.avatarUrl,
+        createdAt: userRow.createdAt.toISOString(),
+      },
+      currentStreak,
+      longestStreak,
+      totalPoints,
+      rank: 1,
+    });
+  }
+
+  // 3. Sort by currentStreak DESC, totalPoints DESC, longestStreak DESC, createdAt ASC
+  entries.sort((a, b) => {
+    if (b.currentStreak !== a.currentStreak) {
+      return b.currentStreak - a.currentStreak;
+    }
+    if (b.totalPoints !== a.totalPoints) {
+      return b.totalPoints - a.totalPoints;
+    }
+    if (b.longestStreak !== a.longestStreak) {
+      return b.longestStreak - a.longestStreak;
+    }
+    return new Date(a.user.createdAt).getTime() - new Date(b.user.createdAt).getTime();
+  });
+
+  // Assign ranks
+  entries.forEach((entry, idx) => {
+    entry.rank = idx + 1;
+  });
+
+  return entries;
 }
