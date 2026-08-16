@@ -17,7 +17,7 @@ export async function calculateStreak(userId: string, db: Database): Promise<num
         eq(activityLogs.userId, userId),
         sql`${activityLogs.category} NOT IN ('daily_log', 'retention', 'streak_bonus')`,
         sql`${activityLogs.activity} NOT IN ('miss', 'no_study', 'workout_gap')`,
-        sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
+        sql`(${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true')`
       )
     )
     .orderBy(desc(activityLogs.logDate));
@@ -72,7 +72,7 @@ export async function calculateMonthlyLogStreak(
         sql`${activityLogs.logDate} <= ${today}`,
         sql`${activityLogs.category} NOT IN ('daily_log', 'retention', 'streak_bonus')`,
         sql`${activityLogs.activity} NOT IN ('miss', 'no_study', 'workout_gap')`,
-        sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
+        sql`(${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true')`
       )
     )
     .orderBy(desc(activityLogs.logDate));
