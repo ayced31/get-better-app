@@ -6,7 +6,7 @@ import { CURRENT_RULES_VERSION } from './points.js';
 
 /**
  * Calculate the current streak for a user.
- * A streak is the number of consecutive days (backwards from today) with ≥1 log.
+ * A streak is the number of consecutive days (backwards from today/yesterday) with ≥1 active log.
  */
 export async function calculateStreak(userId: string, db: Database): Promise<number> {
   const logDates = await db
@@ -15,7 +15,8 @@ export async function calculateStreak(userId: string, db: Database): Promise<num
     .where(
       and(
         eq(activityLogs.userId, userId),
-        sql`${activityLogs.category} NOT IN ('retention', 'streak_bonus')`,
+        sql`${activityLogs.category} NOT IN ('daily_log', 'retention', 'streak_bonus')`,
+        sql`${activityLogs.activity} NOT IN ('miss', 'no_study', 'workout_gap')`,
         sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
       )
     )
@@ -23,14 +24,23 @@ export async function calculateStreak(userId: string, db: Database): Promise<num
 
   if (logDates.length === 0) return 0;
 
+  const today = getISTDate();
+  const yesterday = subtractDay(today);
+
+  // If latest user log is older than yesterday, streak is completely broken (0)
+  const latestLogDate = logDates[0].date;
+  if (latestLogDate !== today && latestLogDate !== yesterday) {
+    return 0;
+  }
+
   let streak = 0;
-  let expected = getISTDate(); // today in IST
+  let expected = latestLogDate;
 
   for (const row of logDates) {
     if (row.date === expected) {
       streak++;
       expected = subtractDay(expected);
-    } else if (row.date < expected) {
+    } else {
       // Gap found — streak broken
       break;
     }
@@ -49,6 +59,7 @@ export async function calculateMonthlyLogStreak(
   referenceDate?: string
 ): Promise<number> {
   const today = referenceDate ?? getISTDate();
+  const yesterday = subtractDay(today);
   const monthStart = today.substring(0, 7) + '-01';
 
   const logDates = await db
@@ -59,7 +70,8 @@ export async function calculateMonthlyLogStreak(
         eq(activityLogs.userId, userId),
         sql`${activityLogs.logDate} >= ${monthStart}`,
         sql`${activityLogs.logDate} <= ${today}`,
-        sql`${activityLogs.category} NOT IN ('retention', 'streak_bonus')`,
+        sql`${activityLogs.category} NOT IN ('daily_log', 'retention', 'streak_bonus')`,
+        sql`${activityLogs.activity} NOT IN ('miss', 'no_study', 'workout_gap')`,
         sql`${activityLogs.metadata} IS NULL OR (${activityLogs.metadata}->>'automatic') IS NULL OR (${activityLogs.metadata}->>'automatic') != 'true'`
       )
     )
@@ -67,8 +79,13 @@ export async function calculateMonthlyLogStreak(
 
   if (logDates.length === 0) return 0;
 
+  const latestLogDate = logDates[0].date;
+  if (latestLogDate !== today && latestLogDate !== yesterday) {
+    return 0;
+  }
+
   let streak = 0;
-  let expected = today;
+  let expected = latestLogDate;
 
   for (const row of logDates) {
     if (row.date === expected) {
