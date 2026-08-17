@@ -206,7 +206,7 @@ export function Leaderboard() {
                 <span>User</span>
               </div>
               <div className="flex items-center gap-lg">
-                <span style={{ width: '40px', textAlign: 'center' }}>Streak</span>
+                <span style={{ width: '30px', textAlign: 'center' }}>Streak</span>
                 <span style={{ width: '60px', textAlign: 'right' }}>Points</span>
               </div>
             </div>

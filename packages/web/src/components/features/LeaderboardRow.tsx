@@ -42,17 +42,17 @@ export function LeaderboardRow({
         <span className="lb-row__name">
           {entry.user.displayName || entry.user.username}
         </span>
-        {position === 1 ? (
-          <span className="lb-row__moonlord">
-            Moonlord
+        {position === 1 && (
+          <span className="lb-row__moonlord" title="Moonlord">
+            <span className="lb-row__moonlord-text">Moonlord</span>
+            <span className="lb-row__moonlord-icon">💀</span>
           </span>
-        ) : (
-          <RankBadge
-            rankName={entry.rank}
-            rankEmoji={entry.rankEmoji}
-            size="sm"
-          />
         )}
+        <RankBadge
+          rankName={entry.rank}
+          rankEmoji={entry.rankEmoji}
+          size="sm"
+        />
       </div>
 
       <div className="lb-row__meta">

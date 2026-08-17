@@ -28,7 +28,7 @@ export function StreakIndicator({
 
   return (
     <span className={classes}>
-      <span className="streak__icon" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--color-warning)', marginRight: 'var(--space-xxs)' }}>STREAK</span>
+      <span className="streak__icon">🔥</span>
       <span className="streak__count">{streak}</span>
       {showLabel && <span className="streak__label">day streak</span>}
     </span>

@@ -64,8 +64,17 @@
 .lb-row__meta {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-lg);
   flex-shrink: 0;
+}
+
+.lb-row__streak-wrap {
+  min-width: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  transform: translateX(20px);
 }
 
 .lb-row__points {
@@ -73,12 +82,8 @@
   font-weight: 700;
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
-  min-width: 48px;
+  min-width: 60px;
   text-align: right;
-}
-
-.lb-row__streak-wrap {
-  flex-shrink: 0;
 }
 
 /* Divider between rows */
@@ -109,6 +114,14 @@
   display: inline-flex;
   align-items: center;
   user-select: none;
+}
+
+.lb-row__moonlord-text {
+  display: inline;
+}
+
+.lb-row__moonlord-icon {
+  display: none;
 }
 
 @keyframes red-glow {
@@ -151,9 +164,23 @@
   }
 
   .lb-row__moonlord {
-    font-size: 9px;
-    padding: 1px 4px;
+    padding: 2px 4px;
     border-radius: 3px;
+  }
+
+  .lb-row__moonlord-text {
+    display: none;
+  }
+
+  .lb-row__moonlord-icon {
+    display: inline;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .lb-row__streak-wrap {
+    transform: none;
+    min-width: auto;
   }
 
   .lb-row__points {
